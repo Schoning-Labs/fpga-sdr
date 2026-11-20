@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Digital-mode decode list (FT8, FT4 and WSPR). Formatting (UTC, dB, DT, Hz offset) is done in
+// Rust before it reaches `PanelModel.ft8-decodes`; this only lays fixed-height rows out and
+// scrolls them. `PanelModel.ft8-decodes` is expected newest first (index 0 is the latest
+// decode), and this component does not sort it, it draws top to bottom.
+
+import { Theme } from "theme.slint";
+import { PanelModel } from "../model.slint";
+
+export component DigitalPanel inherits Rectangle {
+    in property <bool> compact: false;
+    property <length> row-height: compact ? 14px : 22px;
+    property <length> col-time: compact ? 42px : 52px;
+    property <length> col-db: compact ? 32px : 34px;
+    property <length> col-dt: compact ? 24px : 32px;
+    property <length> col-offset: compact ? 34px : 46px;
+
+    background: Theme.panel-frame;
+    border-width: 1px;
+    border-color: Theme.panel-frame-active;
+
+    VerticalLayout {
+        padding: compact ? 3px : 6px;
+        spacing: 2px;
+
+        Text {
+            text: "FT8 decodes";
+            color: Theme.text-dim;
+            font-size: compact ? 9px : 11px;
+        }
+
+        // Column header, fixed above the scrolling rows.
+        HorizontalLayout {
+            spacing: compact ? 3px : 6px;
+            Text { text: "Time"; color: Theme.text-dim; font-size: compact ? 7px : 9px; width: col-time; }
+            Text { text: "dB"; color: Theme.text-dim; font-size: compact ? 7px : 9px; width: col-db; }
+            Text { text: "DT"; color: Theme.text-dim; font-size: compact ? 7px : 9px; width: col-dt; }
+            Text { text: "Offset"; color: Theme.text-dim; font-size: compact ? 7px : 9px; width: col-offset; }
+            Text { text: "Message"; color: Theme.text-dim; font-size: compact ? 7px : 9px; }
+        }
+
+        Rectangle {
+            // Thin rule between the header and the scrolling list.
+            height: 1px;
+            background: Theme.panel-frame-active;
+        }
+
+        // Scrollable, top-aligned, fixed-height rows: the rows stay compact and the list
+        // scrolls, so about 40 decodes fit without growing the panel.
+        Flickable {
+            vertical-stretch: 1;
+            content-height: PanelModel.ft8-decodes.length * row-height;
+
+            VerticalLayout {
+                alignment: start;
+                for decode in PanelModel.ft8-decodes: Rectangle {
+                    height: row-height;
+                    HorizontalLayout {
+                        spacing: compact ? 3px : 6px;
+                        Text {
+                            text: decode.utc-text;
+                            color: Theme.text-dim;
+                            font-size: compact ? 8px : 11px;
+                            width: col-time;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: decode.snr-text;
+                            color: Theme.accent;
+                            font-size: compact ? 8px : 11px;
+                            width: col-db;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: decode.dt-text;
+                            color: Theme.text-dim;
+                            font-size: compact ? 8px : 11px;
+                            width: col-dt;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: decode.freq-offset-text;
+                            color: Theme.text-dim;
+                            font-size: compact ? 8px : 11px;
+                            width: col-offset;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: decode.message-text;
+                            color: Theme.text-primary;
+                            font-size: compact ? 8px : 11px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

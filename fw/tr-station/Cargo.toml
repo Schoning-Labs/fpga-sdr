@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# The station firmware logic (docs/P2_FT8_FW.md): FT8 slot timing, message parsing, the QSO sequence,
+# TX slot choice, the screen's state, the LISTEN and FreeDV receive paths, and the glue between that
+# logic and the tr-fabric drivers. `no_std` + `alloc`, the same code on the board, under QEMU and in
+# host tests.
+#
+# A binary that links this crate also links tr-freedv (LGPL-2.1) and tr-modes (which vendors the
+# GPL-3.0 mfsk-core), so that binary is distributed under the terms of that code.
+
+[package]
+name = "tr-station"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "FT8 station logic and radio glue"
+
+[dependencies]
+tr-regs = { path = "../tr-regs" }
+tr-fabric = { path = "../tr-fabric" }
+tr-net = { path = "../tr-net", default-features = false }
+tr-hl2 = { path = "../tr-hl2", default-features = false }
+tr-gui = { path = "../tr-gui" }
+# the console key codes of the arrow and page keys (LISTEN screen keys, docs/LISTEN.md)
+tr-input = { path = "../tr-input" }
+tr-dsp = { path = "../tr-dsp" }
+# FreeDV 700D/700E receive (LGPL-2.1-only crates, see docs/FREEDV.md section 3 for how they are distributed)
+tr-freedv = { path = "../tr-freedv" }
+tr-modes = { path = "../tr-modes", default-features = false, features = ["ft8", "fft-portable"] }
+libm = { version = "0.2", default-features = false }
+num-complex = { version = "0.4", default-features = false, features = ["libm"] }
+
+[features]
+# The loop-back self-test against the mock fabric (host test, QEMU image). Not for the board image.
+selftest = ["tr-fabric/mock"]
+
+[dev-dependencies]
+hound = "3.5.1"
+tr-fabric = { path = "../tr-fabric", features = ["mock"] }
+tr-station = { path = ".", features = ["selftest"] }
+# the simulated HL2 message-layer firmware for the HL2 session test
+tr-hl2 = { path = "../tr-hl2", default-features = false, features = ["sim"] }
+# the in-memory Ethernet segment for the HL2 session test
+tr-net = { path = "../tr-net", features = ["std"] }
+# the list of keys the network input must drop is checked against `keys::event_for` (docs/NETINPUT.md)
+tr-input = { path = "../tr-input" }

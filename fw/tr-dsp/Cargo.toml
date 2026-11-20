@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "tr-dsp"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "f32 DSP: filters, AGC, demodulators and the bit-exact receiver back-end model"
+
+[dependencies]
+libm = "0.2.16"
+
+[dev-dependencies]
+hound = "3.5.1"
+# The back-end testbench fixtures pack register words with the generated field positions.
+tr-regs = { path = "../tr-regs" }
+# End-to-end fixture (receiver bank model -> back-end model).
+tr-rxmodel = { path = "../tr-rxmodel" }

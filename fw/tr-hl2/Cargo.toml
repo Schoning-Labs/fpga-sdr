@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# `std` is a default feature: plain `cargo test` (tools/check.sh) builds and tests the PC path.
+# The future AE350 firmware build (tr-fabric, tr-app) depends on this crate with
+# `default-features = false` for the no_std core (discovery/register/bridge/filter wire format,
+# DHCP server logic). `socket2` is needed only for the `std` PC networking (SO_RCVBUF sizing
+# beyond what std::net exposes); it is not a dependency of the no_std core.
+
+[package]
+name = "tr-hl2"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Hermes-Lite 2 protocol: discovery, control, register bridge and the safety byte"
+
+[features]
+default = ["std"]
+std = ["dep:socket2"]
+# The simulated HL2 (`sim` module) without `std`, for tests of no_std users of this crate.
+sim = []
+
+[dependencies]
+socket2 = { version = "0.5", optional = true }
+
+[[bin]]
+name = "hl2ctl"
+path = "src/bin/hl2ctl.rs"
+required-features = ["std"]

@@ -1,0 +1,409 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Physical constraints of rtl/top/sdr_top.v: which pin (ball) of the chip every port of the top level is wired to, and
+// how each pin is set up electrically. The chip is the GW5AST-LV138FPG676AC1/I0 (device version B) on the Sipeed Tang Mega 138K Pro
+// dock (docs/BOARD.md lists every fact used here with its source).
+//
+// HOW TO READ THE LINES (Gowin's physical constraint format; comments start with //)
+//   IO_LOC "port" BALL;       the ball of the chip package that the port is connected to. A differential pair gives two balls,
+//                             the positive one first and the negative one second.
+//   IO_PORT "port" IO_TYPE=... PULL_MODE=... DRIVE=... BANK_VCCIO=...;   the electrical setup of the pin:
+//     IO_TYPE      the signaling standard. LVCMOS33 = ordinary 3.3 V logic. LVCMOS33D = two 3.3 V pins driven as one differential
+//                  pair (emulated LVDS, used for HDMI). SSTL15 = the 1.5 V single-ended signaling of DDR3 memory, and SSTL15D its
+//                  differential version for the memory clock and the data strobes.
+//     PULL_MODE    the resistor that the chip itself connects to the pin: NONE, UP (to the supply) or DOWN (to ground).
+//                  PULL_STRENGTH sets how strong a pull resistor is.
+//     DRIVE        the output current of the pin driver in milliamps; inputs have none.
+//     BANK_VCCIO   the supply voltage of the I/O bank the pin is in. The voltage is fixed by the board (3.3 V for the ordinary pins,
+//                  1.5 V for the DDR3 pins), and all pins of one bank must agree.
+//   CLOCK_LOC "net" BUFG[n] = CLK;   puts a clock on global clock line n (explained at the clock line block near the end).
+//   INS_LOC "instance" SITE;         fixes a primitive of the netlist (here the PLLs) to one site of the chip.
+// Sources: the Sipeed example repository (Apache-2.0), namely ae350_customized_demo/src/ae350_customized_demo.cst (AE350 flash,
+// JTAG, DDR3 byte lanes 0 to 3 and the DDR3 PLL location), simple_video_out/svo/src/hdmi.cst (HDMI TX port 0),
+// udp_rgmii_send/src/top.cst (RGMII transmit, PHY reference and reset) and audio/audio_music (PT8211); the dock schematic 4071f,
+// sheets RGMII_sch (RGMII receive pins, MDIO and MDC) and DBG_UART (the BL616 UART); and sfp+/10G_Serial_Ethernet/XGbE_UDP/src/
+// fpga_project.cst (SFP0 TX_DISABLE and LOS, and the LED pins).
+// gowin/p1/build.sh makes a copy of this file for the build: it removes the block of the memory size that is not built (the lines
+// between the begin and end markers that carry a DDR3-256-ONLY or DDR3-1G-ONLY tag), renames the row address bit 14 port for the
+// 256 MB build, and can move the four USB host pins to another connector. Those marker lines and the pin lines are matched
+// by text, so they must not be changed.
+
+// ---- clock, reset key, debug UART. All 3.3 V LVCMOS pins.
+// clk_50m: the 50 MHz oscillator on the SOM, the source of every clock of the chip. Input, no pull resistor.
+IO_LOC "clk_50m" P16;
+IO_PORT "clk_50m" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+// key_rst_n: the button USR_KEY.3 on the dock, low while it is pressed. The pull-up holds the pin high when it is released.
+IO_LOC "key_rst_n" G16;
+IO_PORT "key_rst_n" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+// uart_txd: output, 8 mA, to the receive input of the BL616 USB bridge chip on the dock, which carries the AE350's debug UART to the PC.
+IO_LOC "uart_txd" P15;
+IO_PORT "uart_txd" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// uart_rxd: input from the BL616's transmit output. The pull-up keeps the line at the idle level (high) when nothing drives it.
+IO_LOC "uart_rxd" N16;
+IO_PORT "uart_rxd" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+// ---- AE350 instruction flash and JTAG (Sipeed ae350 demo)
+// The six flash pins go to the SPI NOR flash chip on the SOM, from which the CPU runs its program. The AE350's own flash controller
+// drives them: write protect, hold, clock, data out (MOSI), data in (MISO) and chip select. 3.3 V, 8 mA, no pull resistor.
+IO_LOC "FLASH_SPI_WPN" P14;
+IO_PORT "FLASH_SPI_WPN" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "FLASH_SPI_HOLDN" N14;
+IO_PORT "FLASH_SPI_HOLDN" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "FLASH_SPI_CLK" H13;
+IO_PORT "FLASH_SPI_CLK" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "FLASH_SPI_MOSI" R14;
+IO_PORT "FLASH_SPI_MOSI" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "FLASH_SPI_MISO" R15;
+IO_PORT "FLASH_SPI_MISO" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "FLASH_SPI_CSN" P18;
+IO_PORT "FLASH_SPI_CSN" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// The AE350's JTAG debug port, for a hardware debugger: TDI, TRST, TMS and TCK are inputs, TDO is an output at 8 mA. 3.3 V, no pull.
+IO_LOC "TDI_IN" P23;
+IO_PORT "TDI_IN" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "TRST_IN" P21;
+IO_PORT "TRST_IN" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "TMS_IN" W21;
+IO_PORT "TMS_IN" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "TCK_IN" Y21;
+IO_PORT "TCK_IN" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "TDO_OUT" U14;
+IO_PORT "TDO_OUT" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// ---- DDR3 begin (docs/MEM_1GB.md): both x16 chips, 32 data lines, 15 row address lines.
+// With TR_DDR=256 gowin/p1/build.sh takes the "DDR3-1G-ONLY" block out of the build's copy of this file and
+// renames DDR3_ADDR[14] to DDR3_A14 (the AE350's own controller: one chip on byte lanes 0-1, 14 row lines).
+// DDR3 memory (two x16 chips share the address and control lines; the first chip is on byte lanes 0 and 1, the second on lanes 2 and 3).
+// All DDR3 pins use SSTL15 in a 1.5 V bank, with no pull resistors (the board terminates the lines). The drive strengths are
+// those of Sipeed's example and are kept exactly: 12 mA on data, data mask, address and control, 4 mA on CKE, and 8 mA on the
+// clock (CK) and the data strobes (DQS), which are differential pairs and so use SSTL15D with two balls each.
+// The three bank address lines BA0 to BA2 (which of the eight banks inside the memory chips is addressed).
+IO_LOC "DDR3_BANK[2]" K3;
+IO_PORT "DDR3_BANK[2]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_BANK[1]" L5;
+IO_PORT "DDR3_BANK[1]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_BANK[0]" M4;
+IO_PORT "DDR3_BANK[0]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+// Address lines A0 to A13. The same lines carry the row address and, later in a command, the column address.
+IO_LOC "DDR3_ADDR[13]" U2;
+IO_PORT "DDR3_ADDR[13]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[12]" N3;
+IO_PORT "DDR3_ADDR[12]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[11]" P4;
+IO_PORT "DDR3_ADDR[11]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[10]" M1;
+IO_PORT "DDR3_ADDR[10]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[9]" T3;
+IO_PORT "DDR3_ADDR[9]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[8]" T4;
+IO_PORT "DDR3_ADDR[8]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[7]" U1;
+IO_PORT "DDR3_ADDR[7]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[6]" N4;
+IO_PORT "DDR3_ADDR[6]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[5]" T2;
+IO_PORT "DDR3_ADDR[5]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[4]" P1;
+IO_PORT "DDR3_ADDR[4]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[3]" N2;
+IO_PORT "DDR3_ADDR[3]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[2]" R2;
+IO_PORT "DDR3_ADDR[2]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[1]" R1;
+IO_PORT "DDR3_ADDR[1]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_ADDR[0]" N1;
+IO_PORT "DDR3_ADDR[0]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+// ODT, on-die termination control of the memory chips.
+IO_LOC "DDR3_ODT" J1;
+IO_PORT "DDR3_ODT" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+// CKE, clock enable of the memory chips: 4 mA, as in Sipeed's example.
+IO_LOC "DDR3_CKE" L3;
+IO_PORT "DDR3_CKE" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=4 BANK_VCCIO=1.5;
+// The command lines: WE# (write enable), CAS# (column address strobe), RAS# (row address strobe), CS# (chip select).
+IO_LOC "DDR3_WE_N" J3;
+IO_PORT "DDR3_WE_N" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_CAS_N" H1;
+IO_PORT "DDR3_CAS_N" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_RAS_N" H2;
+IO_PORT "DDR3_RAS_N" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_CS_N" L4;
+IO_PORT "DDR3_CS_N" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+// RESET#, the reset of the memory chips.
+IO_LOC "DDR3_RESET_N" N8;
+IO_PORT "DDR3_RESET_N" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+// Data masks DM[1:0], one per byte lane, of the first chip.
+IO_LOC "DDR3_DM[1]" H9;
+IO_PORT "DDR3_DM[1]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DM[0]" F4;
+IO_PORT "DDR3_DM[0]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+// Data lines DQ[15:0] of byte lanes 0 and 1 (the first chip). They are bidirectional.
+IO_LOC "DDR3_DQ[15]" F7;
+IO_PORT "DDR3_DQ[15]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[14]" G6;
+IO_PORT "DDR3_DQ[14]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[13]" F8;
+IO_PORT "DDR3_DQ[13]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[12]" D6;
+IO_PORT "DDR3_DQ[12]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[11]" G8;
+IO_PORT "DDR3_DQ[11]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[10]" H6;
+IO_PORT "DDR3_DQ[10]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[9]" H8;
+IO_PORT "DDR3_DQ[9]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[8]" E6;
+IO_PORT "DDR3_DQ[8]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[7]" K6;
+IO_PORT "DDR3_DQ[7]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[6]" K8;
+IO_PORT "DDR3_DQ[6]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[5]" J5;
+IO_PORT "DDR3_DQ[5]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[4]" K7;
+IO_PORT "DDR3_DQ[4]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[3]" G5;
+IO_PORT "DDR3_DQ[3]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[2]" L8;
+IO_PORT "DDR3_DQ[2]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[1]" J6;
+IO_PORT "DDR3_DQ[1]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[0]" G4;
+IO_PORT "DDR3_DQ[0]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+// Row address bit 14, used by the chips of the 1 GB build, which have 15 row address lines. The 256 MB build has 14 and
+// holds this bit low.
+IO_LOC "DDR3_ADDR[14]" U5;
+IO_PORT "DDR3_ADDR[14]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+// The memory clock pair CK and CK#, positive ball first. 8 mA, SSTL15D.
+IO_LOC "DDR3_CK" M2,L2;
+IO_PORT "DDR3_CK" IO_TYPE=SSTL15D PULL_MODE=NONE DRIVE=8 BANK_VCCIO=1.5;
+// The data strobes DQS[1] and DQS[0] of the first chip, a differential pair each (positive ball first). 8 mA, SSTL15D.
+IO_LOC "DDR3_DQS[1]" H7,G7;
+IO_PORT "DDR3_DQS[1]" IO_TYPE=SSTL15D PULL_MODE=NONE DRIVE=8 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQS[0]" J4,H4;
+IO_PORT "DDR3_DQS[0]" IO_TYPE=SSTL15D PULL_MODE=NONE DRIVE=8 BANK_VCCIO=1.5;
+// ---- DDR3-1G-ONLY begin: the second chip (byte lanes 2-3), from Sipeed's ae350_customized_demo.cst
+// (Apache-2.0), checked against the SOM schematic's pin table
+// The second chip: data masks DM[2] and DM[3] ...
+IO_LOC "DDR3_DM[2]" E3;
+IO_PORT "DDR3_DM[2]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DM[3]" A3;
+IO_PORT "DDR3_DM[3]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+// ... data lines DQ[16] to DQ[31] ...
+IO_LOC "DDR3_DQ[16]" C4;
+IO_PORT "DDR3_DQ[16]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[17]" F3;
+IO_PORT "DDR3_DQ[17]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[18]" B4;
+IO_PORT "DDR3_DQ[18]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[19]" E5;
+IO_PORT "DDR3_DQ[19]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[20]" D3;
+IO_PORT "DDR3_DQ[20]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[21]" D5;
+IO_PORT "DDR3_DQ[21]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[22]" A4;
+IO_PORT "DDR3_DQ[22]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[23]" D4;
+IO_PORT "DDR3_DQ[23]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[24]" E1;
+IO_PORT "DDR3_DQ[24]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[25]" A2;
+IO_PORT "DDR3_DQ[25]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[26]" G2;
+IO_PORT "DDR3_DQ[26]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[27]" C2;
+IO_PORT "DDR3_DQ[27]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[28]" F2;
+IO_PORT "DDR3_DQ[28]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[29]" E2;
+IO_PORT "DDR3_DQ[29]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[30]" G1;
+IO_PORT "DDR3_DQ[30]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQ[31]" D1;
+IO_PORT "DDR3_DQ[31]" IO_TYPE=SSTL15 PULL_MODE=NONE DRIVE=12 BANK_VCCIO=1.5;
+// ... and the data strobes DQS[2] and DQS[3].
+IO_LOC "DDR3_DQS[2]" B5,A5;
+IO_PORT "DDR3_DQS[2]" IO_TYPE=SSTL15D PULL_MODE=NONE DRIVE=8 BANK_VCCIO=1.5;
+IO_LOC "DDR3_DQS[3]" C1,B1;
+IO_PORT "DDR3_DQS[3]" IO_TYPE=SSTL15D PULL_MODE=NONE DRIVE=8 BANK_VCCIO=1.5;
+// ---- DDR3-1G-ONLY end
+// ---- DDR3 end
+// ---- RTL8211F RGMII PHY on the RJ45 socket and its management interface: same locations as gowin/cst/h3_rgmii_phy.cst. All 3.3 V LVCMOS.
+// Receive side (inputs from the PHY, no pull resistor): the receive clock RXC, the control line RX_CTL (data valid) and the four data
+// lines RXD0 to RXD3. RXC is sampled as ordinary data by the network unit and is no clock of the design.
+IO_LOC "rgmii_rxc" C23;
+IO_PORT "rgmii_rxc" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "rgmii_rx_ctl" C22;
+IO_PORT "rgmii_rx_ctl" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "rgmii_rxd[0]" B26;
+IO_PORT "rgmii_rxd[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "rgmii_rxd[1]" C26;
+IO_PORT "rgmii_rxd[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "rgmii_rxd[2]" D26;
+IO_PORT "rgmii_rxd[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "rgmii_rxd[3]" E26;
+IO_PORT "rgmii_rxd[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+// Transmit side (outputs, 8 mA): the transmit clock TXC (25 MHz, made by a register of clk_eth), the control line TX_CTL and the four
+// data lines TXD0 to TXD3.
+IO_LOC "rgmii_txc" H24;
+IO_PORT "rgmii_txc" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "rgmii_tx_ctl" J24;
+IO_PORT "rgmii_tx_ctl" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "rgmii_txd[0]" K21;
+IO_PORT "rgmii_txd[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "rgmii_txd[1]" J21;
+IO_PORT "rgmii_txd[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "rgmii_txd[2]" L19;
+IO_PORT "rgmii_txd[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "rgmii_txd[3]" K18;
+IO_PORT "rgmii_txd[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// phy_clk: the PHY's 25 MHz reference clock. phy_rst_n: reset of the PHY, low = reset. phy_mdc and phy_mdio: the management clock and
+// data line, with which the firmware talks to the PHY's registers. MDIO is bidirectional and has a pull-up, because it is driven
+// open-drain style (the line is released to high).
+IO_LOC "phy_clk" E18;
+IO_PORT "phy_clk" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "phy_rst_n" E17;
+IO_PORT "phy_rst_n" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "phy_mdc" K23;
+IO_PORT "phy_mdc" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "phy_mdio" K22;
+IO_PORT "phy_mdio" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+// ---- HDMI TX port 0 (Sipeed simple_video_out). The dock has no HDMI chip: each TMDS pair is two ordinary pins driven as an
+// emulated differential pair (IO_TYPE=LVCMOS33D, 3.3 V, 8 mA) by an ELVDS_OBUF in the top level, positive ball first. The pairs are
+// data lane 0 (AB24, AC24), lane 1 (V24, W24), lane 2 (AA22, AA23) and the clock lane (Y22, Y23).
+IO_LOC "tmds_p[0]" AB24,AC24;
+IO_PORT "tmds_p[0]" IO_TYPE=LVCMOS33D PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "tmds_p[1]" V24,W24;
+IO_PORT "tmds_p[1]" IO_TYPE=LVCMOS33D PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "tmds_p[2]" AA22,AA23;
+IO_PORT "tmds_p[2]" IO_TYPE=LVCMOS33D PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "tmds_clk_p" Y22,Y23;
+IO_PORT "tmds_clk_p" IO_TYPE=LVCMOS33D PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// ---- PT8211 audio DAC (the headphone output): bit clock BCK E22, word select WS F24, data DIN G24 (Sipeed audio/audio_music/src/audio.cst;
+// dock schematic sheet DAC+PA: PT8211 pin 1 BCK = I2S_BCLK E22, pin 2 WS = I2S_LRCK F24, pin 3 DIN = I2S_DIN G24). Outputs, 3.3 V, 8 mA.
+IO_LOC "hp_bck" E22;
+IO_PORT "hp_bck" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "hp_ws" F24;
+IO_PORT "hp_ws" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "hp_din" G24;
+IO_PORT "hp_din" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// ---- audio outputs begin (docs/AUDIO_OUT.md). PMOD2 = J26; balls from the dock schematic 4071f, PMOD sheet
+// (PMOD2_IO4 B21, IO1 B20, IO5 A20, IO2 B19, IO6 A19), the same pins as in an earlier design by the same author.
+// J26 pins 5, 6 (A17, A18) and 11 (C21) stay free.
+// The digital audio outputs on the PMOD2 connector J26: S/PDIF on pin 12 (B21, for a TOSLINK transmitter module), and I2S for a DAC
+// board on pins 9 (B20 bit clock), 10 (A20 word clock), 7 (B19 data) and 8 (A19 master clock). Outputs, 3.3 V, 8 mA.
+IO_LOC "spdif_out" B21;
+IO_PORT "spdif_out" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "i2s_bck" B20;
+IO_PORT "i2s_bck" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "i2s_ws" A20;
+IO_PORT "i2s_ws" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "i2s_sd" B19;
+IO_PORT "i2s_sd" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "i2s_mclk" A19;
+IO_PORT "i2s_mclk" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// The 48 MHz clock clk_48m, which the audio PLL is made from, is on global clock line 8 (SUG1018 2.7). It keeps that line because the USB
+// logic runs on it as well. The audio clock clk_aud (49.152 MHz) is on line 10, assigned with the other clocks further down.
+CLOCK_LOC "clk_48m" BUFG[8] = CLK;
+// ---- audio outputs end
+// ---- USB audio begin (docs/USB_AUDIO.md section 9): the "Custom USB" socket J5 as a full-speed device. Pins as
+// in Sipeed's usb2_soft/usb_uart_loopback/src/usb_ref.cst, dock schematic
+// PERIPHERALS sheet: T19/U19 reach D+/D- through 0 ohm (R17, R19), M19 switches the 1.5 kohm pull-up on D+ (R16).
+// The six pins of the high-speed circuit are inputs without pull. The USB logic runs on clk_48m, which keeps
+// its global line 8 above: on ordinary wiring hold failures were measured with this core.
+// Pins of the USB-C socket J5, which the dock wires directly to the chip without a USB PHY chip: usb_dp and usb_dn are D+ and D-
+// (through 0 ohm resistors) and usb_pullup switches the 1.5 kohm pull-up on D+ that tells the PC a full-speed device is attached.
+// All three at 3.3 V, 8 mA, no pull resistor.
+IO_LOC "usb_dp" T19;
+IO_PORT "usb_dp" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "usb_dn" U19;
+IO_PORT "usb_dn" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "usb_pullup" M19;
+IO_PORT "usb_pullup" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// The six pins of the unused high-speed USB circuit: inputs without pull, so they do not disturb anything.
+IO_LOC "usb_hs_unused[0]" M21;
+IO_PORT "usb_hs_unused[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "usb_hs_unused[1]" M22;
+IO_PORT "usb_hs_unused[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "usb_hs_unused[2]" U21;
+IO_PORT "usb_hs_unused[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "usb_hs_unused[3]" V21;
+IO_PORT "usb_hs_unused[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "usb_hs_unused[4]" T20;
+IO_PORT "usb_hs_unused[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "usb_hs_unused[5]" U20;
+IO_PORT "usb_hs_unused[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+// ---- USB audio end
+// ---- USB host begin (docs/USB_HOST.md sections 3 and 4): the Muse Lab PMOD-USBHOST board on PMOD0 = J22. Dock
+// pins 9/10 = USB1, 11/12 = USB2; a = the odd pin (PMOD0_IO1 L22, PMOD0_IO0 N18), b = the even pin (PMOD0_IO5
+// N17, PMOD0_IO4 M26); balls from the dock schematic 4071f, PMOD sheet. Bank 3, 3.3 V. The pins' own pull-downs
+// are the host's (DS1239 table 3-8: medium = 150 uA at most; UG304 3.5.4, 3.5.11). N17 and N18 are also SSPI
+// pins: the build frees them (use_sspi_as_gpio). TR_USBH_PMOD=1 moves the four to PMOD1 = J24 (gowin/p1/build.sh).
+// The four data pins of the USB host board on PMOD0 (J22): usbh_a is the odd pin and usbh_b the even pin of each of the two USB ports. They
+// are bidirectional at 3.3 V, 8 mA, with a medium pull-down, because a USB host holds each data line low through its own pull-down
+// resistor (about 15 kohm) when no device is attached.
+IO_LOC "usbh_a[0]" L22;
+IO_PORT "usbh_a[0]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN PULL_STRENGTH=MEDIUM DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "usbh_b[0]" N17;
+IO_PORT "usbh_b[0]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN PULL_STRENGTH=MEDIUM DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "usbh_a[1]" N18;
+IO_PORT "usbh_a[1]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN PULL_STRENGTH=MEDIUM DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "usbh_b[1]" M26;
+IO_PORT "usbh_b[1]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN PULL_STRENGTH=MEDIUM DRIVE=8 BANK_VCCIO=3.3;
+// ---- USB host end
+// ---- SFP+ cages and the board's I2C (docs/SFP_LINKS.md section 7; dock schematic rev 1.2 sheets SFP-PLUS,
+// TWI_MUX, CLOCK; Sipeed sfp+/10G_Serial_Ethernet/XGbE_UDP/src/fpga_project.cst). The serial pairs of quad 1
+// lanes 0 and 1 and the reference pair are dedicated pins, bound by the transceiver block.
+// SFP+ cages. sfp_tx_disable (output, 8 mA): 1 switches the module's transmitter off. SFP0 is R18 and SFP1 is M20. sfp_los (input
+// with pull-up): loss of signal from the module, V18 for SFP0 and W18 for SFP1.
+IO_LOC "sfp_tx_disable[0]" R18;
+IO_PORT "sfp_tx_disable[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "sfp_tx_disable[1]" M20;
+IO_PORT "sfp_tx_disable[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "sfp_los[0]" V18;
+IO_PORT "sfp_los[0]" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+IO_LOC "sfp_los[1]" W18;
+IO_PORT "sfp_los[1]" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+// The board's system I2C bus (to the clock chips and the modules' memories): twi_scl and twi_sda with pull-ups, since an I2C bus is a
+// wired-AND line, and twi_sel[2:0] (N19, P19, P26) choose the channel of the I2C multiplexer. 3.3 V, 8 mA.
+IO_LOC "twi_scl" K25;
+IO_PORT "twi_scl" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "twi_sda" K26;
+IO_PORT "twi_sda" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "twi_sel[2]" N19;
+IO_PORT "twi_sel[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "twi_sel[1]" P19;
+IO_PORT "twi_sel[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "twi_sel[0]" P26;
+IO_PORT "twi_sel[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// ---- global clock lines. The chip has 16 global clock lines, BUFG[0] to BUFG[15] (lines 0 to 7 are the primary ones and lines 8 to 15 the
+// long-wire lines), and every clock belongs on one of them, because a clock on ordinary routing arrives at different registers at very
+// different times (large skew) and gives hold failures. CLOCK_LOC "net" BUFG[n] = CLK puts the net on line n. A line that is not named can be
+// given by the tool to another net with many loads, for instance the DDR3 reset, which leaves a clock on ordinary routing, so all
+// of the long-wire lines are assigned here except line 11, which is left to the tool for clk_eth (the network unit's 100 MHz clock).
+// Line 8 is clk_48m (above), 9 is the oscillator (clk_50m_d is the name of its net after the input buffer), 10 is clk_aud, 12 is
+// sfp_txc, 13 is n1_rxc, 14 is bl_rxc and 15 is clk_pix.
+CLOCK_LOC "clk_50m_d" BUFG[9] = CLK;
+// clk_aud (49.152 MHz, the audio PLL's output) is on line 10. The RJ45 PHY's receive clock is no clock of the design (the network unit
+// samples it as data), so no line is spent on it.
+CLOCK_LOC "clk_aud" BUFG[10] = CLK;
+// clk_eth (100 MHz, the network unit) would go on line 11, but its net is inside the core and is not at the top level of the netlist, so
+// CLOCK_LOC cannot find it by name and the tool places it.
+CLOCK_LOC "clk_pix" BUFG[15] = CLK;
+CLOCK_LOC "sfp_txc" BUFG[12] = CLK;
+CLOCK_LOC "n1_rxc" BUFG[13] = CLK;
+CLOCK_LOC "bl_rxc" BUFG[14] = CLK;
+// The two LEDs of sdr_top.v on the dock's six LEDs. They are active low (the LED sits between the 3.3 V supply and the pin), so
+// the pin is the inverse of the logical value: led[0] is on when the DDR3 controller has calibrated and led[1] is on while the receivers
+// see the HL2's sample stream.
+// ---- LEDs
+IO_LOC "led[0]" R26;
+IO_PORT "led[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "led[1]" L20;
+IO_PORT "led[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+// ---- placement: the DDR3 memory clock must come from PLL_L[0] clkout2 (MUG1031 8.3)
+INS_LOC "u_pll_ddr3/PLL_inst" PLL_L[0];
+// The AE350 stays in its own reset (bus resets low, silent UART) unless its PLL is at PLL_R[0] (Gowin MUG1031 8.3.2 and 8.4.1;
+// found on this board).
+INS_LOC "u_pll_ae350/PLL_inst" PLL_R[0];
+
+// ---- the global clock lines of this design are the CLOCK_LOC lines above. The PHY's 25 MHz reference is a register of clk_eth and not
+// a PLL output, so it needs no line of its own.

@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# HL2 link packet memory (docs/ARCHITECTURE.md 4.1 page 0xE802_0000), wired by
+# rtl/top/hl2_pkt_port.v.
+
+[block]
+name = "hl2_pkt"
+base = 0xE802_0000
+size = 0x0001_0000
+status = "draft"
+description = """
+HL2 link packet memory (docs/ARCHITECTURE.md 3.1, 4.1): the 4 KB CPU receive ring of the receive block
+(rtl/hl2link/cpu_rx_ring.v), read-only, one 32-bit word per 4 bytes of ring, byte k of the ring in
+bits [8(k%4)+7 : 8(k%4)] (little-endian, so a word copy keeps the stream order). The write pointer
+is hl2_link.ring_wptr. Reads cross into the RGMII receive clock domain: about 20 AHB clocks each.
+The upper half is H2's CPU transmit queue (rtl/hl2link/cpu_tx_queue.v, 4 KB, one frame in flight),
+in the 125 MHz transmit clock domain: write the frame (destination MAC to last payload byte, no FCS)
+as little-endian words at tx_queue, then its length in bytes to tx_send; tx_status.busy stays high
+until the frame has gone out.
+"""
+
+[[register]]
+name = "rx_ring"
+offset = 0x0000
+count = 1024
+stride = 0x004
+access = "RO"
+reset = 0
+description = "CPU receive ring, 4 bytes per word."
+
+[[register]]
+name = "tx_queue"
+offset = 0x8000
+count = 1024
+stride = 0x004
+access = "RW"
+reset = 0
+description = "CPU transmit queue, write-only in effect (reads return 0): byte 4i+k of the frame in bits [8k+7:8k]."
+
+[[register]]
+name = "tx_send"
+offset = 0xC000
+description = "Write the frame length to queue the frame written at tx_queue for sending."
+
+[[register.field]]
+name = "length"
+bits = "15:0"
+access = "RW"
+reset = 0
+description = "Frame length in bytes, without FCS."
+
+[[register]]
+name = "tx_status"
+offset = 0xC004
+description = "CPU transmit queue status."
+
+[[register.field]]
+name = "busy"
+bits = "0"
+access = "RO"
+reset = 0
+description = "1 = a queued frame has not finished sending; do not write tx_queue."

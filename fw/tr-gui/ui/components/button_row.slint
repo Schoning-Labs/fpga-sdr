@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// One reusable row of exclusive-choice buttons: the mode and AGC selectors are both "pick one
+// of these labeled buttons", so they share this component instead of each repeating the same
+// layout and highlight logic. `compact` selects the smaller sizes of the 1024x600 panel.
+
+import { Theme } from "theme.slint";
+
+export component ButtonRow inherits Rectangle {
+    in property <[string]> labels: [];
+    in property <int> active-index: -1;
+    in property <bool> compact: false;
+    in property <string> title: "";
+    callback selected(int);
+
+    VerticalLayout {
+        spacing: 2px;
+        Text {
+            text: title;
+            color: Theme.text-dim;
+            font-size: compact ? 9px : 11px;
+            visible: title != "";
+        }
+        HorizontalLayout {
+            spacing: compact ? 2px : 4px;
+            for lbl[i] in labels: Rectangle {
+                background: i == active-index ? Theme.button-active : Theme.button-idle;
+                border-width: 1px;
+                border-color: i == active-index ? Theme.accent : Theme.panel-frame-active;
+                border-radius: 3px;
+                min-width: compact ? 28px : 52px;
+                min-height: compact ? 20px : 32px;
+                Text {
+                    text: lbl;
+                    color: i == active-index ? Theme.text-primary : Theme.text-dim;
+                    font-size: compact ? 9px : 13px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                TouchArea {
+                    clicked => { root.selected(i); }
+                }
+            }
+        }
+    }
+}

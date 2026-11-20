@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Menu button plus its drop-down list. Slint draws the list on top of the FPGA windows when it is
+// open, using ordinary (non-key-color) pixels, which is the point of the compositor's key color
+// (docs/ARCHITECTURE.md 3.5): a menu can cover the waterfall without a separate alpha plane.
+// `z: 100` on the list keeps it above everything else in the panel.
+
+import { Theme } from "theme.slint";
+import { PanelModel } from "../model.slint";
+
+export component MenuBar inherits Rectangle {
+    in property <bool> compact: false;
+    width: compact ? 60px : 90px;
+    height: compact ? 20px : 32px;
+    background: PanelModel.menu-open ? Theme.button-active : Theme.button-idle;
+    border-width: 1px;
+    border-color: Theme.panel-frame-active;
+    border-radius: 3px;
+
+    Text {
+        text: "Menu";
+        color: Theme.text-primary;
+        font-size: compact ? 10px : 14px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    TouchArea {
+        clicked => { PanelModel.request-menu-open(); }
+    }
+
+    if PanelModel.menu-open: Rectangle {
+        x: 0;
+        y: parent.height + 2px;
+        width: compact ? 110px : 160px;
+        height: PanelModel.menu-items.length * (compact ? 18px : 26px) + 4px;
+        background: Theme.panel-frame;
+        border-width: 1px;
+        border-color: Theme.accent;
+        z: 100;
+
+        VerticalLayout {
+            padding: 2px;
+            for item[i] in PanelModel.menu-items: Rectangle {
+                height: compact ? 18px : 26px;
+                background: i == PanelModel.menu-selected-index ? Theme.button-active : transparent;
+                Text {
+                    text: item;
+                    color: Theme.text-primary;
+                    font-size: compact ? 9px : 12px;
+                    vertical-alignment: center;
+                    x: 6px;
+                }
+                TouchArea {
+                    clicked => { PanelModel.request-menu-select(i); }
+                }
+            }
+        }
+    }
+}

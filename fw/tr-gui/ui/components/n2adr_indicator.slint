@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// N2ADR filter-board indicator (docs/ARCHITECTURE.md 8): which filter is selected, and whether it
+// covers every active receiver. The firmware picks one filter set that passes as many active
+// receivers as it can and flags the rest here, it does not hide them.
+
+import { Theme } from "theme.slint";
+import { PanelModel } from "../model.slint";
+
+export component N2adrIndicator inherits Rectangle {
+    in property <bool> compact: false;
+    background: Theme.panel-frame;
+    border-width: 1px;
+    border-color: PanelModel.n2adr-ok ? Theme.panel-frame-active : Theme.accent-warn;
+
+    VerticalLayout {
+        padding: compact ? 4px : 8px;
+        spacing: 2px;
+        Text {
+            text: "N2ADR filter";
+            color: Theme.text-dim;
+            font-size: compact ? 9px : 11px;
+        }
+        Text {
+            text: PanelModel.n2adr-filter-text;
+            color: Theme.text-primary;
+            font-size: compact ? 11px : 16px;
+            font-weight: 600;
+        }
+        Text {
+            text: PanelModel.n2adr-warning-text;
+            color: Theme.accent-warn;
+            font-size: compact ? 8px : 11px;
+            visible: !PanelModel.n2adr-ok && PanelModel.n2adr-warning-text != "";
+            wrap: word-wrap;
+        }
+    }
+}

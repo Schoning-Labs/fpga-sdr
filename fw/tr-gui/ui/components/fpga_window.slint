@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// A reserved rectangle for the FPGA compositor (docs/ARCHITECTURE.md 3.5): spectrum trace or
+// waterfall. Its interior is the flat key color and nothing else, no text and no children, so
+// every pixel in it reaches the framebuffer unchanged and the compositor's key color comparison
+// finds it. The decorative frame is drawn outside the key color area, never inside it.
+
+import { Theme } from "theme.slint";
+
+export component FpgaWindow inherits Rectangle {
+    in property <string> label: "";
+    // Reserved strip above the key color area for the label, so the label text is never drawn
+    // over a key color pixel. Only 2 px when there is no label.
+    property <length> title-height: label == "" ? 2px : 16px;
+
+    background: Theme.panel-frame;
+    border-width: 1px;
+    border-color: Theme.panel-frame-active;
+
+    Text {
+        x: 6px;
+        y: 1px;
+        text: label;
+        color: Theme.text-dim;
+        font-size: 11px;
+        visible: label != "";
+    }
+
+    Rectangle {
+        x: 2px;
+        y: title-height;
+        width: parent.width - 4px;
+        height: parent.height - title-height - 2px;
+        background: Theme.key-colour;
+    }
+}

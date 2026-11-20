@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// FT8 operating screen at 1920x1080 as a window of its own, for the host test (docs/P2_FT8_FW.md).
+// The firmware shows `AppScreen1920x1080` (app_1920x1080.slint), which holds this view and the
+// FreeDV and LISTEN views as well.
+
+import { Ft8View } from "ft8_view.slint";
+export { Ft8Model, Ft8Row } from "ft8_model.slint";
+
+export component Ft8Screen1920x1080 inherits Window {
+    width: 1920px;
+    height: 1080px;
+    Ft8View { }
+}

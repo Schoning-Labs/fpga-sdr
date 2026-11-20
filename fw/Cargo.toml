@@ -1,0 +1,122 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Firmware workspace (docs/ARCHITECTURE.md section 5.2). `default-members` are the crates that
+# build and test on the host (`cargo test`, from this directory or the repo root); the AE350-only
+# crates (tr-ae350, tr-fabric, tr-app, tr-bench) are no_std and only ever cross-built for
+# riscv32imafc-unknown-none-elf (see tools/check.sh), so they are workspace members but not
+# default members. tr-net is the exception in that group: like tr-hl2, `std` is a default
+# feature (see fw/tr-net/Cargo.toml) so its host-side test (tests/dhcp_sntp.rs -- smoltcp over an
+# in-memory ring model, completing DHCP then an SNTP exchange) runs under plain `cargo test`; the
+# AE350 firmware build depends on it with `default-features = false` for the no_std core instead.
+# tr-bench depends on tr-ae350 (for its QEMU-only `dsp_bench` binary,
+# gated by the `board-qemu` feature the same way tr-app/qemu_smoke is -- see
+# fw/tr-bench/Cargo.toml) and on the `riscv` crate's CSR accessors, which is why it sits next to
+# tr-ae350/tr-app here rather than next to tr-dsp.
+
+[workspace]
+resolver = "2"
+members = [
+    "tr-regs",
+    "tr-ae350",
+    "tr-fabric",
+    "tr-hl2",
+    "tr-dsp",
+    "tr-modes",
+    "tr-filters",
+    "tr-vita49",
+    "tr-tci",
+    "tr-net",
+    "tr-gui",
+    # FT8 station logic and the radio glue on the drivers (host tests; no_std on the target)
+    "tr-station",
+    "tr-app",
+    "tr-bench",
+    "tr-sim",
+    "tr-rxmodel",
+    "xtask",
+    # Stage-0 loader.
+    "tr-image",
+    "tr-loader",
+    "tr-loader-layout",
+    "tr-loader-send",
+    "tr-loader-testfw",
+    # Bring-up ladder start-up program (target-only, like tr-bench)
+    "tr-ladder",
+    # FT8 decoder CPU part under QEMU (tools/qemu_s15.sh); target-only, like tr-bench.
+    "tr-ft8bench",
+    # FreeDV. Codec 2 700C and the FreeDV modems, Rust ports of LGPL-2.1 code (their own
+    # licence files; docs/FREEDV.md).
+    "tr-codec2",
+    "tr-freedv",
+    # FreeDV receive under QEMU (tools/qemu_freedv.sh); target-only, like tr-bench.
+    "tr-freedvbench",
+    # USB audio (docs/USB_AUDIO.md): the USB descriptors, source of the RTL descriptor ROM
+    "tr-usb",
+    "tr-usbh",
+    # USB host (docs/USB_HOST.md): enumeration, descriptor parser, audio class 1.0 and HID drivers
+    "tr-usbh",
+    # PC mouse and keyboard over UDP (docs/NETINPUT.md)
+    "tr-input",
+]
+default-members = [
+    "tr-regs",
+    "tr-hl2",
+    "tr-dsp",
+    "tr-modes",
+    "tr-filters",
+    "tr-vita49",
+    "tr-tci",
+    "tr-net",
+    "tr-gui",
+    "tr-station",
+    "tr-sim",
+    "tr-rxmodel",
+    "xtask",
+    # host-buildable/testable parts of the stage-0 loader (see fw/tr-loader/Cargo.toml,
+    # fw/tr-loader-testfw/Cargo.toml for why the other two are not default members).
+    "tr-image",
+    "tr-loader-layout",
+    "tr-loader-send",
+    "tr-codec2",
+    "tr-freedv",
+    "tr-usb",
+    "tr-input",
+]
+
+# Release profile (cpu-budget work, docs/CPU_BUDGET.md section 4): one codegen unit and fat LTO
+# let LLVM inline across crates (tr-dsp -> firmware, libm) and optimise the whole image at once.
+# Measured under QEMU with tools/qemu_s2.sh; see that section for the effect per kernel.
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "fat"
+
+# vendor/mfsk-core is a patched copy of mfsk-core 0.11.0 (three small
+# no_std/alloc fixes to its wspr module — see vendor/mfsk-core/Cargo.toml's
+# header and docs/S5_MODES.md "no_std FFT backend" for exactly what and
+# why). Applies workspace-wide, so tr-modes's `mfsk-core = "0.11"`
+# dependency resolves to this copy instead of the crates.io one.
+[patch.crates-io]
+mfsk-core = { path = "vendor/mfsk-core" }
+
+# The FT8 decode tests (tr-modes: WSJT-X samples, the S15 front end) run mfsk-core's and the model's
+# DSP over whole 15 s slots; unoptimised that takes minutes under `cargo test`. Optimise just these
+# two crates in dev/test builds (debug assertions and overflow checks stay on).
+[profile.dev.package.mfsk-core]
+opt-level = 3
+
+[profile.dev.package.tr-modes]
+opt-level = 3
+
+# FreeDV tests run whole recordings through the codec and the modem.
+[profile.dev.package.tr-codec2]
+opt-level = 3
+
+[profile.dev.package.tr-freedv]
+opt-level = 3
+
+# The FreeDV station path runs the 12 kHz and 48 kHz sample-rate converters (generic code that is
+# compiled in this crate) over whole recordings in its tests.
+[profile.dev.package.tr-station]
+opt-level = 3

@@ -1,0 +1,195 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# The network unit on the board's RJ45 socket (docs/DECISIONS.md 2026-10-21, docs/HL2_SFP.md section 9, docs/NET_ID.md): the
+# Ethernet MAC rtl/net/eth_top.v behind rtl/net/net_unit.v. THE ONE PLACE of its page number and layout: the base below
+# is the page the bus bridge sends to the network unit's clock (rtl/top/sdr_core.v reads NET_BASE) and the page the
+# firmware uses (tr_regs::generated::net::BASE). Since 2026-10-21 (NET_ID) it is the page 0xE924_0000, which an earlier design by the same
+# author also uses, so that one loader finds the network unit at the same address in both. The offsets 0x00 to 0x40 belong to
+# rtl/net/eth_top.v, the chip ID words 0x80 to 0x9C to rtl/net/net_unit.v and rtl/net/chip_dna.v.
+
+[block]
+name = "net"
+base = 0xE924_0000
+size = 0x0001_0000
+status = "final"
+description = """
+Network unit on the RJ45 socket (RTL8211F, RGMII at 100 Mbit/s full duplex): the eth_top register page,
+in the 100 MHz network clock (about 20 AHB clocks per access). One frame out (2 KB), a 4 KB ring of frames in, MDIO.
+Chip ID (Gowin OTP DNA, 64 bits) at 0x80 to 0x9C. The layout is fixed and changes only with an entry in docs/DECISIONS.md.
+"""
+
+[[register]]
+name = "id"
+offset = 0x00
+access = "RO"
+reset = 0x4554_0001
+description = "Identifier 'ET' + version 1 (eth_top)."
+
+[[register]]
+name = "ctrl"
+offset = 0x04
+access = "RW"
+reset = 0x14
+description = "Bit 0 receiver on, 1 transmitter on, 2 PHY reset pin low, 3 every frame, 4 broadcast, 5 multicast."
+
+[[register]]
+name = "status"
+offset = 0x08
+access = "RO"
+reset = 0
+description = "Bit 0 a frame waits, 1 transmitter busy, 2 the PHY's receive clock runs, 3 PHY link, 5:4 speed (0 10, 1 100, 2 1000), 6 full duplex (the PHY's in-band report)."
+
+[[register]]
+name = "flags"
+offset = 0x0C
+access = "RW"
+reset = 0
+description = "Bit 0 frame waiting, 1 frame sent, 2 frame dropped, 3 MDIO done; write 1 to bits 1 to 3 to clear them."
+
+[[register]]
+name = "irq_enable"
+offset = 0x10
+access = "RW"
+reset = 0
+description = "Interrupt enable per flag bit."
+
+[[register]]
+name = "mac_lo"
+offset = 0x14
+access = "RW"
+reset = 0x004A_5402
+description = "Our MAC address bytes 0 to 3 (byte 0 first on the wire, in bits 7:0)."
+
+[[register]]
+name = "mac_hi"
+offset = 0x18
+access = "RW"
+reset = 0x0100
+description = "Our MAC address bytes 4 and 5 in bits 15:0."
+
+[[register]]
+name = "mdio"
+offset = 0x1C
+access = "RW"
+reset = 0
+description = "Write: bit 30 read, 25:21 PHY, 20:16 register, 15:0 value; read: bit 31 busy, 15:0 the value read."
+
+[[register]]
+name = "tx_len"
+offset = 0x20
+access = "RW"
+reset = 0
+description = "Write: send the frame in the buffer, this many bytes (padded to 60). Read: bit 0 busy."
+
+[[register]]
+name = "tx_data"
+offset = 0x24
+access = "RW"
+reset = 0
+description = "The next 4 bytes of the frame to send (byte k in bits 8k+7:8k)."
+
+[[register]]
+name = "tx_ptr"
+offset = 0x28
+access = "RW"
+reset = 0
+description = "Write: the next tx_data goes to the start of the buffer."
+
+[[register]]
+name = "rx_len"
+offset = 0x2C
+access = "RO"
+reset = 0
+description = "Length of the waiting frame in bytes (FCS not included), 0 when none waits."
+
+[[register]]
+name = "rx_data"
+offset = 0x30
+access = "RO"
+reset = 0
+description = "The next 4 bytes of the waiting frame."
+
+[[register]]
+name = "rx_done"
+offset = 0x34
+access = "RW"
+reset = 0
+description = "Write: the waiting frame is read, the next one comes."
+
+[[register]]
+name = "rx_count"
+offset = 0x38
+access = "RO"
+reset = 0
+description = "Good frames received."
+
+[[register]]
+name = "rx_dropped"
+offset = 0x3C
+access = "RO"
+reset = 0
+description = "15:0 frames dropped for lack of room, 31:16 with a bad FCS or length; reading clears both."
+
+[[register]]
+name = "tx_count"
+offset = 0x40
+access = "RO"
+reset = 0
+description = "Frames sent."
+
+[[register]]
+name = "dna_raw0"
+offset = 0x80
+access = "RO"
+reset = 0
+description = "Chip ID read, raw bits 31:0 of the OTP shift (register bit k = raw bit k; raw bit 0 is DOUT before the first clock edge)."
+
+[[register]]
+name = "dna_raw1"
+offset = 0x84
+access = "RO"
+reset = 0
+description = "Chip ID read, raw bits 63:32."
+
+[[register]]
+name = "dna_raw2"
+offset = 0x88
+access = "RO"
+reset = 0
+description = "Chip ID read, raw bits 95:64."
+
+[[register]]
+name = "dna_raw3"
+offset = 0x8C
+access = "RO"
+reset = 0
+description = "Chip ID read, raw bits 127:96."
+
+[[register]]
+name = "dna_raw4"
+offset = 0x90
+access = "RO"
+reset = 0
+description = "Bit 0 is raw bit 128 (one past the register)."
+
+[[register]]
+name = "dna_status"
+offset = 0x94
+access = "RO"
+reset = 0
+description = "Bit 0 the OTP read is done (about 150 us after reset), 15:8 the ID width in bits (64 when the reader is in the build)."
+
+[[register]]
+name = "dna_id_lo"
+offset = 0x98
+access = "RO"
+reset = 0
+description = "Chip ID (Gowin OTP DNA, MODE 2'b01, valid bits 95:32 of the 128-bit read, SUG283-3.6.1E section 8.9) bits 31:0."
+
+[[register]]
+name = "dna_id_hi"
+offset = 0x9C
+access = "RO"
+reset = 0
+description = "Chip ID bits 63:32."

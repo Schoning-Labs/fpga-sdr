@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Front-panel and operating-screen UI of the radio, written in Slint. The crate builds two ways:
+#   - `cargo test -p tr-gui` on the host renders the screens with the software renderer and
+#     writes PNG screenshots (docs/S11_GUI.md).
+#   - `cargo build --target riscv32imafc-unknown-none-elf -p tr-gui` builds the same crate as a
+#     `no_std` rlib for the firmware. src/lib.rs explains how the two builds are reconciled.
+#
+# Slint feature choice (docs/DECISIONS.md: pure Rust, no C/C++ backends): default-features are
+# off and only "renderer-software" is selected, as Slint's own bare-metal guidance (the `slint`
+# crate's bundled mcu.md) recommends. It is the only renderer feature enabled, so there is no
+# "renderer-femtovg" (OpenGL), "renderer-skia" (links Google's Skia, C++) or "backend-qt" (Qt,
+# C++), on host or target. The same render path runs everywhere and no GUI toolkit is linked.
+
+[package]
+name = "tr-gui"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Slint front-panel and operating-screen UI"
+
+[lib]
+name = "tr_gui"
+path = "src/lib.rs"
+
+[dependencies]
+# "compat-1-2" is required whenever default-features is off (see slint-build's own docs); it is
+# not a rendering feature. "unsafe-single-threaded" and "libm" are the two features the Slint
+# MCU guide selects for a bare-metal target with no OS thread-local storage and no `std`
+# floating point. They are harmless on the host build too, so one feature set covers both targets.
+slint = { version = "1.18.1", default-features = false, features = [
+    "compat-1-2",
+    "unsafe-single-threaded",
+    "libm",
+    "renderer-software",
+] }
+# `core::f32` has no `floor`/`round` (those need `std` or a software implementation), so the
+# crate uses this pure-Rust, no_std library, the same way Slint's own "libm" feature does inside.
+libm = "0.2"
+# Mouse and keyboard events of the USB host stack (docs/USB_HOST.md); no_std, no dependencies.
+tr-usbh = { path = "../tr-usbh" }
+
+[build-dependencies]
+slint-build = "1.18.1"
+
+[dev-dependencies]
+# Pure-Rust PNG encoder (no libpng/zlib C dependency), used only by the host screenshot tests.
+png = "0.17"

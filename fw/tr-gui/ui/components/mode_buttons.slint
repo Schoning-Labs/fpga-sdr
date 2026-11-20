@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// The mode selector (LSB, USB, CW, AM, FM, DIGI) as a `ButtonRow` bound to `PanelModel`.
+
+import { ButtonRow } from "button_row.slint";
+import { PanelModel } from "../model.slint";
+
+export component ModeButtons inherits ButtonRow {
+    title: "Mode";
+    labels: PanelModel.mode-names;
+    active-index: PanelModel.active-mode-index;
+    selected(i) => { PanelModel.request-mode-select(i); }
+}

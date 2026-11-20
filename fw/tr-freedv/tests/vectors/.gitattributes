@@ -1,0 +1,4 @@
+*.trace binary
+*.raw binary
+*.txt -text
+*.counts -text

@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# Synthetic register block, not part of the radio. It exists only so `xtask regmap` has real
+# material to run over and so its output has one place both toolchains can check against
+# (an iverilog testbench and a Rust test agree on every address
+# and field here). It plays the same role for the register map that rtl/example/adder.v plays for
+# the Verilog testbenches of tools/check.sh. See docs/REGMAP.md for the format.
+#
+# Deliberately touches every access type and shape the format supports: a read-only register,
+# a read/write register with two fields, a register with two write-1-to-clear status flags,
+# and a small register array (like the receiver bank's per-receiver pair, docs/ARCHITECTURE.md
+# 3.2).
+
+[block]
+name = "example"
+base = 0xE8EE_0000
+size = 0x0000_1000
+status = "test"
+description = "Regmap generator self-test fixture. Not a real fabric block."
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x1CE5_0001
+description = "Fixed block identifier and format version; read-only."
+
+[[register]]
+name = "ctrl"
+offset = 0x004
+description = "Control: an enable bit and a two-bit mode select."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = block running."
+
+[[register.field]]
+name = "mode"
+bits = "2:1"
+access = "RW"
+reset = 0
+description = "0..3, meaning is block-specific."
+
+[[register]]
+name = "status"
+offset = 0x008
+description = "Sticky status flags. Each bit is set by hardware and cleared by firmware writing a 1 to it (write-1-to-clear); see docs/REGMAP.md on why a register with W1C fields gets no modify()."
+
+[[register.field]]
+name = "overflow"
+bits = "0"
+access = "W1C"
+reset = 0
+description = "Set when an input overran; cleared by writing 1."
+
+[[register.field]]
+name = "error"
+bits = "1"
+access = "W1C"
+reset = 0
+description = "Set on an internal error; cleared by writing 1."
+
+[[register]]
+name = "channel"
+offset = 0x010
+count = 4
+stride = 0x004
+description = "Per-channel gain, four instances at consecutive words (docs/ARCHITECTURE.md 3.2's per-receiver phase_inc/ctrl pair is the real-block version of this shape)."
+
+[[register.field]]
+name = "gain"
+bits = "7:0"
+access = "RW"
+reset = 0x80
+description = "Unsigned gain code, 0-255."

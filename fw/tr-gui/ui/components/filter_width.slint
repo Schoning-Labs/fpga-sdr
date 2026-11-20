@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Read-out of the channel filter width used for the active receiver. `tr-dsp`'s fast-convolution
+// filter (docs/ARCHITECTURE.md 5.2) owns the actual passband, this only shows the number.
+
+import { Theme } from "theme.slint";
+import { PanelModel } from "../model.slint";
+
+export component FilterWidth inherits Rectangle {
+    in property <bool> compact: false;
+
+    VerticalLayout {
+        spacing: 2px;
+        Text {
+            text: "Filter";
+            color: Theme.text-dim;
+            font-size: compact ? 9px : 11px;
+        }
+        Rectangle {
+            background: Theme.button-idle;
+            border-width: 1px;
+            border-color: Theme.panel-frame-active;
+            border-radius: 3px;
+            min-width: compact ? 56px : 90px;
+            min-height: compact ? 20px : 32px;
+            Text {
+                text: PanelModel.filter-width-text;
+                color: Theme.text-primary;
+                font-size: compact ? 11px : 15px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

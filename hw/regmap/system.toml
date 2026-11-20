@@ -1,0 +1,120 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# System block (docs/ARCHITECTURE.md 4.1 page 0xE800_0000, 4.3 interrupts), built in
+# rtl/top/sys_regs.v.
+
+[block]
+name = "system"
+base = 0xE800_0000
+size = 0x0001_0000
+status = "draft"
+description = """
+System block (docs/ARCHITECTURE.md 4.1, 4.3): identification, a scratch register, the 16 fabric
+interrupt lines GP0-GP15 (pending, enable, raw), clock and memory status, and a free-running
+clk_dsp cycle counter. rtl/top/sys_regs.v, docs/P1_TOP.md.
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x5452_0001
+description = "Chip identifier: 'TR' + top-level version 1."
+
+[[register]]
+name = "build"
+offset = 0x004
+access = "RO"
+reset = 0
+description = "Build identifier: the first 8 hex digits of the git commit the bitstream was built from (gowin/p1/build.sh); 0 in simulation."
+
+[[register]]
+name = "scratch"
+offset = 0x008
+access = "RW"
+reset = 0
+description = "Scratch register for bus tests; no effect."
+
+[[register]]
+name = "irq_pending"
+offset = 0x010
+description = "Latched interrupt events, one bit per fabric line GP0-GP15 (docs/ARCHITECTURE.md 4.3). A bit is set by a rising edge of its source; the PLIC line is pending AND enable."
+
+[[register.field]]
+name = "lines"
+bits = "15:0"
+access = "W1C"
+reset = 0
+description = "Bit n = line GPn has fired since last cleared. Write 1 to clear (after clearing the source block's own status)."
+
+[[register]]
+name = "irq_enable"
+offset = 0x014
+description = "Per-line enable of the pending bits onto the AE350's EXT_INT inputs."
+
+[[register.field]]
+name = "lines"
+bits = "15:0"
+access = "RW"
+reset = 0
+description = "Bit n = 1 routes pending line n to PLIC source GPn."
+
+[[register]]
+name = "irq_raw"
+offset = 0x018
+description = "Current level of each interrupt source, before edge latching."
+
+[[register.field]]
+name = "lines"
+bits = "15:0"
+access = "RO"
+reset = 0
+description = "Bit n = source of line GPn is high now."
+
+[[register]]
+name = "status"
+offset = 0x01C
+description = "Clock, memory and bus-bridge status."
+
+[[register.field]]
+name = "ddr3_init"
+bits = "0"
+access = "RO"
+reset = 0
+description = "1 = the AE350's DDR3 controller finished initialisation (DDR3_INIT)."
+
+[[register.field]]
+name = "plls_locked"
+bits = "1"
+access = "RO"
+reset = 0
+description = "1 = every fabric PLL reports lock."
+
+[[register.field]]
+name = "bus_timeout"
+bits = "8"
+access = "W1C"
+reset = 0
+description = "An AHB access to a fabric register timed out (its clock domain gave no answer within 4,096 AHB clocks; the read returned 0xDEAD_BEEF). Write 1 to clear."
+
+[[register.field]]
+name = "rx_domain_dead"
+bits = "9"
+access = "RO"
+reset = 0
+description = "1 = the RGMII receive clock domain did not answer the last access to 0xE802_0000 (no PHY receive clock); accesses there return 0xDEAD_BEEF at once until it answers again."
+
+[[register.field]]
+name = "num_rx"
+bits = "19:16"
+access = "RO"
+reset = 0
+description = "Receivers built into this bitstream (1 to 8; gowin/p1/build.sh TR_NRX, default 4). The per-receiver register arrays of every block keep the 8-receiver layout; receivers at or above this number read 0 and ignore writes. 0 = a bitstream from before this field existed: read it as 8 (fw/tr-fabric/src/system.rs does)."
+
+[[register]]
+name = "dsp_cycles"
+offset = 0x020
+access = "RO"
+reset = 0
+description = "Free-running clk_dsp (120 MHz) cycle counter, low 32 bits."

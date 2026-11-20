@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "tr-usbh"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "USB host stack for the Pmod USB host board: enumeration, descriptor parser, audio class 1.0 and HID drivers (docs/USB_HOST.md)"
+
+[dependencies]

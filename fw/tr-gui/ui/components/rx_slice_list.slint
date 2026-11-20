@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Up to 8 independent receivers (docs/ARCHITECTURE.md 3.2, `rx_bank` N = 4 to 8). One cell per
+// slice in `PanelModel.rx-slices`; the array can be shorter than 8 (fewer receivers built) or
+// have entries marked inactive (built but not tuned to anything, drawn faint). A receiver that
+// is routed to audio has the active button color, and one outside the currently selected N2ADR
+// filter (`in-passband` false) gets an amber border (docs/ARCHITECTURE.md 8).
+
+import { Theme } from "theme.slint";
+import { PanelModel } from "../model.slint";
+
+export component RxSliceList inherits Rectangle {
+    in property <bool> compact: false;
+    background: Theme.panel-frame;
+    border-width: 1px;
+    border-color: Theme.panel-frame-active;
+
+    HorizontalLayout {
+        padding: compact ? 2px : 4px;
+        spacing: compact ? 2px : 4px;
+        for slice in PanelModel.rx-slices: Rectangle {
+            background: slice.active ? (slice.audible ? Theme.button-active : Theme.button-idle) : transparent;
+            border-width: 1px;
+            border-color: slice.in-passband ? Theme.panel-frame-active : Theme.accent-warn;
+            border-radius: 3px;
+            min-width: compact ? 60px : 100px;
+            opacity: slice.active ? 1.0 : 0.35;
+
+            VerticalLayout {
+                padding: 3px;
+                alignment: center;
+                Text {
+                    text: "RX " + slice.id;
+                    color: Theme.text-dim;
+                    font-size: compact ? 8px : 10px;
+                }
+                Text {
+                    text: slice.freq-text;
+                    color: Theme.text-primary;
+                    font-size: compact ? 10px : 14px;
+                    font-weight: 600;
+                }
+                Text {
+                    text: slice.mode-text;
+                    color: Theme.text-dim;
+                    font-size: compact ? 8px : 10px;
+                }
+            }
+            TouchArea {
+                clicked => { PanelModel.request-rx-slice-select(slice.id); }
+            }
+        }
+    }
+}

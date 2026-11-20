@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Resource count for the receiver back end (docs/R4_BACKEND.md section 7) with yosys'
+# experimental Gowin GW5A flow (synthesis only; Gowin EDA gives the real numbers, PLAN R3).
+# yosys does not map multipliers to GW5A DSP blocks, so bk_mul is a black box: every bk_mul
+# instance in the statistics is one DSP block (each is at most 27 x 36, the MULT27X36 mode of one
+# GW5A DSP). Block RAM shows up as 18-kbit primitives (DPB/SDPB/...X9B/SP...). Run from the
+# repository root:
+#   yosys -s sim/rx_backend/yosys_gw5a.ys > sim/rx_backend/out/yosys.log   (several minutes)
+read_verilog -lib rtl/rx_backend/bk_mul.v
+read_verilog rtl/rx_backend/bk_ram.v rtl/rx_backend/bk_rom.v rtl/rx_backend/bk_fifo.v
+read_verilog rtl/rx_backend/bk_front.v rtl/rx_backend/bk_decim.v rtl/rx_backend/bk_chfilt.v
+read_verilog rtl/rx_backend/bk_cordic.v rtl/rx_backend/bk_post.v rtl/rx_backend/bk_ring.v
+read_verilog rtl/rx_backend/rx_backend.v
+synth_gowin -family gw5a -top rx_backend -noiopads
+stat

@@ -1,0 +1,430 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# FT8/FT4 decoder front end (docs/ARCHITECTURE.md 3.12, 4.1 page 0xE80D_0000): the registers of
+# rtl/ft8/ft8_frontend.v, which holds the slot capture and spectrogram engine (F5,
+# docs/F5_FT8SPEC.md), the sync search (F6, docs/F6_SYNC.md) and the candidate engine (F7,
+# docs/F7_CAND.md). Every DDR3 address here is a lane-word address (64-bit words from the start
+# of the DDR3, docs/F4_DDR.md section 2): byte address = 8 x the value. What the firmware does
+# with them per slot: docs/F7_CAND.md, "What the CPU does".
+
+[block]
+name = "ft8"
+base = 0xE80D_0000
+size = 0x0001_0000
+status = "draft"
+description = """
+FT8/FT4 decoder front end (docs/ARCHITECTURE.md 3.12): slot capture and spectrogram (F5), Costas
+sync search (F6), candidate engine (F7). All DDR3 addresses are lane-word addresses (8 bytes each).
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x4638_0002
+description = "Block identifier: F8 + version 2 (version 1 had no second pass: no p2_* registers)."
+
+[[register]]
+name = "irq_status"
+offset = 0x004
+description = "Events; interrupt line 11 = OR of irq_status & irq_enable. Write 1 to clear."
+
+[[register.field]]
+name = "sync_done"
+bits = "7:0"
+access = "W1C"
+reset = 0
+description = "Per receiver: a sync search finished, all its records are in DDR3 (rows searched: sync_rows)."
+
+[[register.field]]
+name = "cand_done"
+bits = "8"
+access = "W1C"
+reset = 0
+description = "The candidate command finished, every output word is in DDR3."
+
+[[register.field]]
+name = "frame"
+bits = "9"
+access = "W1C"
+reset = 0
+description = "A spectrogram frame was written (which: frame_last; 25 per second per receiver)."
+
+[[register.field]]
+name = "p2_done"
+bits = "10"
+access = "W1C"
+reset = 0
+description = "Second pass: the residual's spectrogram is written and its sync search finished, all records are in DDR3 at p2_rec_base."
+
+[[register]]
+name = "irq_enable"
+offset = 0x008
+description = "Which irq_status bits drive interrupt line 11."
+
+[[register.field]]
+name = "sync_done"
+bits = "7:0"
+access = "RW"
+reset = 0
+description = "Per receiver."
+
+[[register.field]]
+name = "cand_done"
+bits = "8"
+access = "RW"
+reset = 0
+description = "Candidate command done."
+
+[[register.field]]
+name = "frame"
+bits = "9"
+access = "RW"
+reset = 0
+description = "Spectrogram frame written."
+
+[[register.field]]
+name = "p2_done"
+bits = "10"
+access = "RW"
+reset = 0
+description = "Second pass done."
+
+[[register]]
+name = "status"
+offset = 0x00C
+description = "Engine state."
+
+[[register.field]]
+name = "spec_busy"
+bits = "0"
+access = "RO"
+reset = 0
+description = "The spectrogram engine is working on a frame."
+
+[[register.field]]
+name = "sync_busy"
+bits = "1"
+access = "RO"
+reset = 0
+description = "A sync search is running or queued."
+
+[[register.field]]
+name = "cand_busy"
+bits = "2"
+access = "RO"
+reset = 0
+description = "A candidate command is running. Write cand_cmd and the cand_* registers only while 0."
+
+[[register.field]]
+name = "cap_overflow"
+bits = "3"
+access = "RO"
+reset = 0
+description = "Sticky until reset: the slot capture dropped an audio sample."
+
+[[register.field]]
+name = "p2_busy"
+bits = "4"
+access = "RO"
+reset = 0
+description = "Second pass: from p2_cmd until its records are in DDR3 (irq_status.p2_done). A p2_cmd written while 1 is ignored."
+
+[[register]]
+name = "frame_last"
+offset = 0x010
+description = "The spectrogram frame written last."
+
+[[register.field]]
+name = "rx"
+bits = "2:0"
+access = "RO"
+reset = 0
+description = "Receiver."
+
+[[register.field]]
+name = "frame"
+bits = "16:8"
+access = "RO"
+reset = 0
+description = "Frame number in its slot, 0-371."
+
+[[register]]
+name = "sync_cmd"
+offset = 0x014
+description = "Writing queues a sync search for one receiver (for a second pass over a residual spectrogram; the searches at the triggers and at the slot end start by themselves)."
+
+[[register.field]]
+name = "rx"
+bits = "2:0"
+access = "RW"
+reset = 0
+description = "Receiver."
+
+[[register.field]]
+name = "rows"
+bits = "16:8"
+access = "RW"
+reset = 0
+description = "Spectrogram rows to search, 1-372."
+
+[[register]]
+name = "sync_clocks"
+offset = 0x018
+access = "RO"
+reset = 0
+description = "Length of the last sync search in 120 MHz clocks."
+
+[[register]]
+name = "p2_frame"
+offset = 0x01C
+description = "Second pass: frames of the residual's spectrogram written so far."
+
+[[register.field]]
+name = "value"
+bits = "8:0"
+access = "RO"
+reset = 0
+description = "0-372."
+
+[[register]]
+name = "cand_cmd"
+offset = 0x020
+description = "Writing starts a candidate command on the two lanes (only while status.cand_busy = 0)."
+
+[[register.field]]
+name = "pass2"
+bits = "0"
+access = "RW"
+reset = 0
+description = "0 = pass 1 (slot audio to baseband), 1 = pass 2 (baseband to soft symbols)."
+
+[[register.field]]
+name = "lanes"
+bits = "2:1"
+access = "RW"
+reset = 0
+description = "Bit per lane: 1 = this lane takes part."
+
+[[register]]
+name = "cand_cap_base"
+offset = 0x024
+access = "RW"
+reset = 0
+description = "Pass 1: base of the audio ring to replay (a receiver's cap_base, or a ring of residual audio the CPU wrote: 4 samples of 16 bits per lane word, 2^19 samples)."
+
+[[register]]
+name = "cand_first_sample"
+offset = 0x028
+access = "RW"
+reset = 0
+description = "Pass 1: ring sample index of the slot's first sample (the receiver's slot_boundary)."
+
+[[register]]
+name = "cand_clocks"
+offset = 0x02C
+access = "RO"
+reset = 0
+description = "Length of the last candidate command in 120 MHz clocks."
+
+[[register]]
+name = "p2_cmd"
+offset = 0x030
+description = "Second pass (docs/FT8_PASS2.md). Writing starts it: the spectrogram engine transforms the slot of residual audio in the area at p2_base into the area's spectrogram part (372 frames, between the live frames), then the sync engine searches that spectrogram and writes its records to the area's record part; irq_status.p2_done when they are in DDR3. Write p2_base first. Ignored while status.p2_busy."
+
+[[register.field]]
+name = "rx"
+bits = "2:0"
+access = "RW"
+reset = 0
+description = "The receiver whose band (ia, ib) and power shift apply."
+
+[[register]]
+name = "p2_base"
+offset = 0x034
+description = "Second pass: the 4 MB area of DDR3 it works in, a lane-word address that is a multiple of 2^19 (the low 19 bits are not stored and read 0). In lane words from the base: 0 the residual audio the CPU wrote (180,000 samples from slot sample 0, 4 samples of 16 bits per lane word, 45,000 lane words; also cand_cap_base, with cand_first_sample = 0, for the second pass's candidates); 0x1_0000 the residual's spectrogram (372 frames x 512 lane words); 0x4_0000 its sync records (4 lane words per carrier bin from band.ia of p2_cmd.rx)."
+
+[[register.field]]
+name = "value"
+bits = "26:0"
+access = "RW"
+reset = 0
+description = "Lane-word address; bits 18:0 read 0."
+
+[[register]]
+name = "cand_inc"
+offset = 0x040
+count = 2
+stride = 0x010
+access = "RW"
+reset = 0
+description = "Per lane. Pass 1: NCO increment round((f0 + 21.875 Hz) x 2^32 / 12,000). Pass 2: rotation increment round((21.875 Hz - delf) x 2^32 / 200)."
+
+[[register]]
+name = "cand_i0"
+offset = 0x044
+count = 2
+stride = 0x010
+description = "Per lane, pass 2: start sample in the baseband."
+
+[[register.field]]
+name = "value"
+bits = "15:0"
+access = "RW"
+reset = 0
+description = "Signed 16 bit, in 200 sps baseband samples."
+
+[[register]]
+name = "cand_bb_base"
+offset = 0x048
+count = 2
+stride = 0x010
+access = "RW"
+reset = 0
+description = "Per lane: the candidate's baseband, 3,200 lane words {im, re} (pass 1 writes it, pass 2 reads it)."
+
+[[register]]
+name = "cand_sym_base"
+offset = 0x04C
+count = 2
+stride = 0x010
+access = "RW"
+reset = 0
+description = "Per lane, pass 2: where the 632 soft-symbol lane words {im, re} go (79 symbols x 8 tones)."
+
+[[register]]
+name = "ctrl"
+offset = 0x200
+count = 8
+stride = 0x040
+description = "Per receiver: capture and spectrogram on, power shift."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = this receiver's 12 ksps audio is captured and its spectrogram computed."
+
+[[register.field]]
+name = "pwr_shift"
+bits = "12:8"
+access = "RW"
+reset = 16
+description = "Spectrogram power shift sh (docs/ARCHITECTURE.md 3.12 (b)), 0-31."
+
+[[register]]
+name = "cap_base"
+offset = 0x204
+count = 8
+stride = 0x040
+access = "RW"
+reset = 0
+description = "Per receiver: base of the audio capture ring (2^17 lane words = 1 MB, 4 samples per word)."
+
+[[register]]
+name = "spec_base"
+offset = 0x208
+count = 8
+stride = 0x040
+access = "RW"
+reset = 0
+description = "Per receiver: base of the spectrogram (372 frames x 512 lane words = 1.5 MB, two 32-bit power words per lane word)."
+
+[[register]]
+name = "slot_boundary"
+offset = 0x20C
+count = 8
+stride = 0x040
+access = "RW"
+reset = 0
+description = "Per receiver: capture sample count (cap_wr_ptr units) of the slot's first sample. Writing it starts a new slot: frame counter to 0, sync triggers re-armed."
+
+[[register]]
+name = "rec_base"
+offset = 0x210
+count = 8
+stride = 0x040
+access = "RW"
+reset = 0
+description = "Per receiver: where the sync records go, 4 lane words per carrier bin from band.ia (8 x 32-bit words, docs/ARCHITECTURE.md 3.12 (c))."
+
+[[register]]
+name = "band"
+offset = 0x214
+count = 8
+stride = 0x040
+description = "Per receiver: sync search band in 3.125 Hz bins."
+
+[[register.field]]
+name = "ia"
+bits = "9:0"
+access = "RW"
+reset = 32
+description = "First carrier bin."
+
+[[register.field]]
+name = "ib"
+bits = "25:16"
+access = "RW"
+reset = 960
+description = "Last carrier bin, at most 1,009."
+
+[[register]]
+name = "trig"
+offset = 0x218
+count = 8
+stride = 0x040
+description = "Per receiver: early sync searches, started when that many frames of the slot are written (0 = off). The search over all 372 always runs."
+
+[[register.field]]
+name = "trig1"
+bits = "8:0"
+access = "RW"
+reset = 0
+description = "First early search, in frames (295 = 11.8 s)."
+
+[[register.field]]
+name = "trig2"
+bits = "24:16"
+access = "RW"
+reset = 0
+description = "Second early search, in frames (337 = 13.5 s)."
+
+[[register]]
+name = "cap_wr_ptr"
+offset = 0x21C
+count = 8
+stride = 0x040
+access = "RO"
+reset = 0
+description = "Per receiver: audio samples captured since reset (the ring position is this mod 2^19)."
+
+[[register]]
+name = "frame_ptr"
+offset = 0x220
+count = 8
+stride = 0x040
+description = "Per receiver: spectrogram frames of the current slot written so far."
+
+[[register.field]]
+name = "value"
+bits = "8:0"
+access = "RO"
+reset = 0
+description = "0-372."
+
+[[register]]
+name = "sync_rows"
+offset = 0x224
+count = 8
+stride = 0x040
+description = "Per receiver: rows of the sync search that set irq_status.sync_done last."
+
+[[register.field]]
+name = "value"
+bits = "8:0"
+access = "RO"
+reset = 0
+description = "1-372."

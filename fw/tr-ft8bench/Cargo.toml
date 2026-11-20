@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Instruction count of the CPU half of the FT8 decoder (everything the FPGA front end
+# does not do) under QEMU. The fabric's answers come from a trace recorded on the host by
+# `ft8-frontend trace` (fw/tr-modes); build.rs embeds the file named by the S15_TRACE environment
+# variable (an empty trace otherwise, so a plain build still links). Run by tools/qemu_s15.sh.
+# It is a separate crate and not a tr-bench kernel, and the allocator here is a plain
+# size-class free-list allocator.
+
+[package]
+name = "tr-ft8bench"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "FT8 decoder CPU part under QEMU with instruction counting"
+build = "build.rs"
+
+[dependencies]
+tr-modes = { path = "../tr-modes", default-features = false, features = ["ft8", "fft-portable"] }
+tr-ae350 = { path = "../tr-ae350", default-features = false }
+riscv = "0.16"
+riscv-rt = { version = "0.18", features = ["single-hart"] }
+libm = { version = "0.2", default-features = false }
+mfsk-core = { version = "0.11", default-features = false, features = ["alloc", "ft8", "fft-extern"] }
+
+# Same board selection as fw/tr-bench: a plain build (board-ae350) compiles the dependencies only;
+# the benchmark binary exists for `--no-default-features --features board-qemu`.
+[features]
+default = ["board-ae350"]
+board-ae350 = ["tr-ae350/board-ae350"]
+board-qemu = ["tr-ae350/board-qemu"]
+
+[[bin]]
+name = "ft8_bench"
+path = "src/main.rs"
+required-features = ["board-qemu"]
+
+# Per-kernel instruction counts of the FT8 back end (tools/qemu_fo1_kernels.sh).
+[[bin]]
+name = "ft8_kernels"
+path = "src/kernels.rs"
+required-features = ["board-qemu"]
+
+# The decode scheduler with eight receivers replayed from traces (tools/qemu_s17.sh).
+[[bin]]
+name = "ft8_sched"
+path = "src/sched.rs"
+required-features = ["board-qemu"]

@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# `std` is a default feature, the same convention fw/tr-hl2's Cargo.toml uses, so that a plain `cargo test`
+# builds and tests the host side (the `smoltcp` over an in-memory model of the rings, tests/dhcp_sntp.rs)
+# without the riscv32imafc-unknown-none-elf target installed. The firmware (tr-app) depends on this crate
+# with `default-features = false` for the `no_std` core (the `Device` glue, the SNTP client and the clock),
+# which needs neither `std` nor `alloc`, since smoltcp's fixed-size socket storage is enough.
+
+[package]
+name = "tr-net"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "smoltcp glue for the Ethernet MACs: device, SNTP, network time"
+
+[features]
+default = ["std"]
+std = ["smoltcp/alloc"] # SocketSet::new(vec![]) in tests/dhcp_sntp.rs needs smoltcp's own alloc
+
+[dependencies]
+smoltcp = { version = "0.11", default-features = false, features = [
+    "proto-ipv4",
+    "proto-dhcpv4",
+    "socket-dhcpv4",
+    "socket-udp",
+    "medium-ethernet",
+] }

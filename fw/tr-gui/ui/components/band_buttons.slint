@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Ham-band buttons (160 through 10 m, plus general coverage). The N2ADR filter groups (several
+// bands sharing one low-pass filter, docs/ARCHITECTURE.md 8) are a different thing, shown only
+// by the indicator (n2adr_indicator.slint) and never as a button here. 11 buttons are too wide
+// for one row at the small panel size, so `compact` wraps them into two rows instead of
+// reusing `ButtonRow`.
+
+import { Theme } from "theme.slint";
+import { PanelModel } from "../model.slint";
+
+component OneButton inherits Rectangle {
+    in property <int> index;
+    in property <bool> compact: false;
+    background: index == PanelModel.active-band-index ? Theme.button-active : Theme.button-idle;
+    border-width: 1px;
+    border-color: index == PanelModel.active-band-index ? Theme.accent : Theme.panel-frame-active;
+    border-radius: 3px;
+    min-width: compact ? 26px : 40px;
+    min-height: compact ? 18px : 32px;
+    Text {
+        text: PanelModel.band-names[index];
+        color: index == PanelModel.active-band-index ? Theme.text-primary : Theme.text-dim;
+        font-size: compact ? 9px : 13px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    TouchArea {
+        clicked => { PanelModel.request-band-select(index); }
+    }
+}
+
+export component BandButtons inherits Rectangle {
+    in property <bool> compact: false;
+    // Split the 11 bands (160 down to 10, plus Gen) into two roughly even rows for the compact
+    // layout. This is a plain index list and not a filtered `for`, because the body of a Slint
+    // `for` loop cannot be an `if` directly (it must be a single element).
+    property <[int]> row1-indices: [0, 1, 2, 3, 4, 5];
+    property <[int]> row2-indices: [6, 7, 8, 9, 10];
+
+    VerticalLayout {
+        spacing: 2px;
+        Text {
+            text: "Band";
+            color: Theme.text-dim;
+            font-size: compact ? 9px : 11px;
+        }
+
+        // Large panel: one row of all 11 (both index lists back to back in the same row).
+        // Compact: the same two lists, but as two separate rows, so nothing is truncated.
+        if !compact: HorizontalLayout {
+            spacing: 4px;
+            for i in row1-indices: OneButton { index: i; compact: false; }
+            for i in row2-indices: OneButton { index: i; compact: false; }
+        }
+        if compact: VerticalLayout {
+            spacing: 2px;
+            HorizontalLayout {
+                spacing: 2px;
+                for i in row1-indices: OneButton { index: i; compact: true; }
+            }
+            HorizontalLayout {
+                spacing: 2px;
+                for i in row2-indices: OneButton { index: i; compact: true; }
+            }
+        }
+    }
+}

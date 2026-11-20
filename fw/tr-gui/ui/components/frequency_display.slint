@@ -1,0 +1,232 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// The main display of the panel, sized like a real transceiver's: VFO A large, its last three
+// (Hz) digits smaller, VFO B small beneath it, and the mode and filter width read out next to
+// VFO A so the operator can see what is being listened to without looking anywhere else.
+//
+// Every `font-size:` below is a plain literal (`64px`, not a property or a `compact ? a : b`
+// expression) on purpose. The software renderer only has bitmap glyphs for the font sizes it can
+// see written down at compile time (`build.rs`'s `EmbedForSoftwareRenderer`, which pre-rasterizes
+// exactly the sizes the compiler finds used as literals). A computed or property-indirected
+// `font-size` is not recognized by that scan, so the glyphs for it are missing at run time and
+// the renderer silently falls back to its built-in default size, which draws a "58px" VFO A at
+// about 8px with no error. Two full copies of the markup below (`if !compact` and `if compact`),
+// each with its own literal sizes, avoid that trap, and they also keep the embedded glyph set
+// small, since only these specific sizes exist as bitmaps and not whatever range a
+// `compact ? a : b` could in principle produce. tests/screenshots.rs measures the result.
+
+import { Theme } from "theme.slint";
+import { PanelModel } from "../model.slint";
+
+export component FrequencyDisplay inherits Rectangle {
+    in property <bool> compact: false;
+    background: Theme.panel-frame;
+    border-width: 1px;
+    border-color: Theme.panel-frame-active;
+
+    // ---- Large panel (1920x1080): VFO A main digits 64px, sub digits 28px. ----
+    if !compact: VerticalLayout {
+        padding: 10px;
+        spacing: 3px;
+
+        Rectangle {
+            background: PanelModel.active-vfo == 0 ? Theme.button-active : transparent;
+            TouchArea {
+                clicked => { PanelModel.request-vfo-select(0); }
+            }
+            HorizontalLayout {
+                padding-left: 4px;
+                padding-right: 4px;
+                alignment: space-between;
+                HorizontalLayout {
+                    alignment: start;
+                    spacing: 6px;
+                    Text {
+                        text: "A";
+                        color: PanelModel.active-vfo == 0 ? Theme.accent : Theme.text-dim;
+                        font-size: 16px;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: PanelModel.vfo-a-main-text;
+                        color: Theme.text-primary;
+                        // 64px em size: a digit's rendered ink height is only about 70% of the
+                        // font's em size (measured on the rendered image by tests/screenshots.rs),
+                        // so reaching the 44px ink height wanted at 1920x1080 needs this margin.
+                        font-size: 64px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: PanelModel.vfo-a-sub-text;
+                        color: Theme.text-primary;
+                        font-size: 28px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: "Hz";
+                        color: Theme.text-dim;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: PanelModel.mode-names[PanelModel.active-mode-index];
+                        color: Theme.accent;
+                        font-size: 18px;
+                        font-weight: 600;
+                        horizontal-alignment: right;
+                    }
+                    Text {
+                        text: PanelModel.filter-width-text;
+                        color: Theme.text-dim;
+                        font-size: 14px;
+                        horizontal-alignment: right;
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            background: PanelModel.active-vfo == 1 ? Theme.button-active : transparent;
+            TouchArea {
+                clicked => { PanelModel.request-vfo-select(1); }
+            }
+            HorizontalLayout {
+                padding-left: 4px;
+                alignment: start;
+                spacing: 6px;
+                Text {
+                    text: "B";
+                    color: PanelModel.active-vfo == 1 ? Theme.accent : Theme.text-dim;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: PanelModel.vfo-b-main-text;
+                    color: Theme.text-dim;
+                    font-size: 24px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: PanelModel.vfo-b-sub-text;
+                    color: Theme.text-dim;
+                    font-size: 14px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: "Hz";
+                    color: Theme.text-dim;
+                    font-size: 14px;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // ---- Small panel (1024x600): VFO A main digits 42px, sub digits 18px. ----
+    if compact: VerticalLayout {
+        padding: 4px;
+        spacing: 1px;
+
+        Rectangle {
+            background: PanelModel.active-vfo == 0 ? Theme.button-active : transparent;
+            TouchArea {
+                clicked => { PanelModel.request-vfo-select(0); }
+            }
+            HorizontalLayout {
+                padding-left: 4px;
+                padding-right: 4px;
+                alignment: space-between;
+                HorizontalLayout {
+                    alignment: start;
+                    spacing: 3px;
+                    Text {
+                        text: "A";
+                        color: PanelModel.active-vfo == 0 ? Theme.accent : Theme.text-dim;
+                        font-size: 11px;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: PanelModel.vfo-a-main-text;
+                        color: Theme.text-primary;
+                        // 42px em size for the same reason as the 1920x1080 branch: the rendered
+                        // ink height is about 70% of this, which clears the 28px wanted here.
+                        font-size: 42px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: PanelModel.vfo-a-sub-text;
+                        color: Theme.text-primary;
+                        font-size: 18px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: "Hz";
+                        color: Theme.text-dim;
+                        font-size: 10px;
+                        vertical-alignment: center;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: PanelModel.mode-names[PanelModel.active-mode-index];
+                        color: Theme.accent;
+                        font-size: 12px;
+                        font-weight: 600;
+                        horizontal-alignment: right;
+                    }
+                    Text {
+                        text: PanelModel.filter-width-text;
+                        color: Theme.text-dim;
+                        font-size: 10px;
+                        horizontal-alignment: right;
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            background: PanelModel.active-vfo == 1 ? Theme.button-active : transparent;
+            TouchArea {
+                clicked => { PanelModel.request-vfo-select(1); }
+            }
+            HorizontalLayout {
+                padding-left: 4px;
+                alignment: start;
+                spacing: 3px;
+                Text {
+                    text: "B";
+                    color: PanelModel.active-vfo == 1 ? Theme.accent : Theme.text-dim;
+                    font-size: 9px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: PanelModel.vfo-b-main-text;
+                    color: Theme.text-dim;
+                    font-size: 16px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: PanelModel.vfo-b-sub-text;
+                    color: Theme.text-dim;
+                    font-size: 10px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: "Hz";
+                    color: Theme.text-dim;
+                    font-size: 10px;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

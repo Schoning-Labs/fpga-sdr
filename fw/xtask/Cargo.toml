@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Register-map generator, image packer, loader tools"
+
+[dependencies]
+toml = "0.8"
+serde = { version = "1", features = ["derive"] }
+# Image format for the `image` subcommand (docs/C2_LOADER.md "Image format").
+tr-image = { path = "../tr-image" }
+# ELF32 PT_LOAD flattening for `xtask image` (pure Rust, so there is no `objcopy` or `llvm-tools` dependency,
+# see src/image.rs's module doc).
+object = { version = "0.36", default-features = false, features = ["read", "std", "elf"] }

@@ -1,0 +1,537 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# Final for the V2 compositor (rtl/video/compositor.v, docs/V2_COMPOSITOR.md). Everything that
+# describes the picture (windows, colours, overlays, framebuffer base) is double-buffered: the
+# compositor copies the live registers once per frame, at line 1082 of the frame (vertical
+# blank), so a change never shows half-applied and a framebuffer swap happens on the vertical
+# blank. The palette is a BSRAM written through palette_index/palette_data and takes effect at
+# once. Every RW register reads back what was written.
+
+[block]
+name = "video"
+base = 0xE807_0000
+size = 0x0001_0000
+status = "final"
+description = """
+Video compositor (docs/ARCHITECTURE.md 3.5, docs/V2_COMPOSITOR.md): enable, Slint framebuffer
+base/stride, up to 4 FPGA windows (spectrum trace or waterfall; waterfall in windows 0 and 1
+only, each with its own ring and scroll line), the waterfall palettes, colours, grid, 8 receiver passbands, a tuning cursor, and the
+status and underrun counters.
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x5649_0002
+description = "Block identifier/version: 'VI' + version 2 (version 2: a ring base and a scroll line per waterfall window, the zoom waterfall ring)."
+
+[[register]]
+name = "ctrl"
+offset = 0x004
+description = "Output enable and refresh-rate select."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = show the composed picture; 0 = colour bars (the video timing runs either way). Takes effect at the next vertical blank. While 0 the compositor reads no DDR3."
+
+[[register.field]]
+name = "mode_30hz"
+bits = "1"
+access = "RW"
+reset = 0
+description = "0 = 1080p60, 1 = 1080p30 (pixel clock 74.167 MHz, the mode the radio runs because 1080p60 shows no picture on the board's HDMI pins), ARCHITECTURE 3.5. Informational: the mode is chosen at build time."
+
+[[register]]
+# The chip uses the compositor's own register file (rtl/video/compositor.v), which resets to the value below. The unused small module video_regs in rtl/top/block_regs.v resets this register to 0.
+name = "fb_base"
+offset = 0x008
+access = "RW"
+reset = 0x1000_0000
+description = "Slint framebuffer base address in DDR3, byte address, multiple of 8 (docs/ARCHITECTURE.md 5.4: two 4 MB buffers from 0x1000_0000). Takes effect at the next vertical blank: this is the buffer swap."
+
+[[register]]
+# The compositor's register file resets to the value below (3,840 = 1,920 x 2 B); the unused small module video_regs in rtl/top/block_regs.v resets this register to 0.
+name = "fb_stride"
+offset = 0x00C
+access = "RW"
+reset = 3840
+description = "Framebuffer stride in bytes, multiple of 8. Reset value is 1,920 x 2 B (RGB565, ARCHITECTURE 3.5 item 1)."
+
+[[register]]
+name = "win_pos"
+offset = 0x020
+count = 4
+stride = 0x010
+description = "Window top-left corner, one of up to 4 FPGA windows (ARCHITECTURE 3.5 item 2). Windows must not overlap: where they do, the lowest-numbered window wins but its grid lines are not reliable."
+
+[[register.field]]
+name = "x"
+bits = "11:0"
+access = "RW"
+reset = 0
+description = "Left edge, pixels."
+
+[[register.field]]
+name = "y"
+bits = "27:16"
+access = "RW"
+reset = 0
+description = "Top edge, pixels."
+
+[[register]]
+name = "win_size"
+offset = 0x024
+count = 4
+stride = 0x010
+description = "Window width/height, paired with win_pos at the same index."
+
+[[register.field]]
+name = "w"
+bits = "11:0"
+access = "RW"
+reset = 0
+description = "Width, pixels."
+
+[[register.field]]
+name = "h"
+bits = "27:16"
+access = "RW"
+reset = 0
+description = "Height, pixels."
+
+[[register]]
+name = "win_ctrl"
+offset = 0x028
+count = 4
+stride = 0x010
+description = "Window type/source/enable, paired with win_pos/win_size at the same index."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = window drawn."
+
+[[register.field]]
+name = "type_waterfall"
+bits = "1"
+access = "RW"
+reset = 0
+description = "0 = spectrum trace (filled area + line from the line buffer), 1 = waterfall (DDR3 ring + palette), ARCHITECTURE 3.5 item 2. Honoured in windows 0 and 1 only; windows 2 and 3 are always traces."
+
+[[register.field]]
+name = "source_zoom"
+bits = "2"
+access = "RW"
+reset = 0
+description = "0 = full-band spectrum, 1 = zoom spectrum (trace windows; a chip built without the zoom snapshot memory shows the full-band line). A waterfall window selects its source by wf_win_ring and wf_win_ctrl instead."
+
+[[register]]
+name = "win_src"
+offset = 0x02C
+count = 4
+stride = 0x010
+description = "Source column offset of window i: window column 0 shows source column x0 (spectrum line or waterfall line, 0-1,919)."
+
+[[register.field]]
+name = "x0"
+bits = "11:0"
+access = "RW"
+reset = 0
+description = "First source column."
+
+[[register]]
+name = "palette_index"
+offset = 0x060
+description = "Index into the waterfall palette; write here, then write palette_data."
+
+[[register.field]]
+name = "value"
+bits = "7:0"
+access = "RW"
+reset = 0
+description = "Palette entry 0-255."
+
+[[register.field]]
+name = "which"
+bits = "8"
+access = "RW"
+reset = 0
+description = "0 = palette of waterfall window 0, 1 = palette of waterfall window 1."
+
+[[register]]
+name = "palette_data"
+offset = 0x064
+description = "Colour for the palette entry selected by palette_index. Writing this register stores the entry (the palette is BSRAM). Reads return the last value written."
+
+[[register.field]]
+name = "rgb"
+bits = "23:0"
+access = "RW"
+reset = 0
+description = "Colour, 0xRRGGBB."
+
+# ---- the waterfall rings. A ring is 2,048 lines of 1,920 bytes (240 lane words each) in DDR3;
+# addresses are DDR3 lane words (64 bit), the unit every fabric DDR3 client uses (docs/F4_DDR.md
+# section 2). Two hardware writers (rtl/video/waterfall_writer.v) each append to their own ring:
+# the full-band spectrum's (wf_ring_base, wf_write_line) and the zoom spectrum's
+# (wf_zoom_ring_base, wf_zoom_write_line). Each of the two waterfall windows reads the ring its own
+# wf_win_ring points at and scrolls by its own line, see wf_win_ctrl.
+
+[[register]]
+name = "wf_ring_base"
+offset = 0x070
+access = "RW"
+reset = 0
+description = "Full-band waterfall writer: lane-word address of line 0 of the ring it writes. Set it before the full-band spectrum is enabled."
+
+[[register]]
+name = "wf_write_line"
+offset = 0x074
+access = "RO"
+reset = 0
+description = "Full-band waterfall writer: index of the last fully written line (0-2,047; 2,047 after reset = none yet)."
+
+[[register]]
+name = "wf_zoom_ring_base"
+offset = 0x07C
+access = "RW"
+reset = 0
+description = "Zoom waterfall writer: lane-word address of line 0 of the ring it writes. Set it before the zoom spectrum is enabled."
+
+# ---- zoom waterfall and compositor registers
+
+[[register]]
+name = "key"
+offset = 0x078
+description = "Key colour: where the Slint framebuffer holds this RGB565 value inside a window, the FPGA layer shows through (ARCHITECTURE 3.5 item 4)."
+
+[[register.field]]
+name = "rgb565"
+bits = "15:0"
+access = "RW"
+reset = 0xF81F
+description = "Key colour, RGB565 (magenta)."
+
+[[register]]
+name = "status"
+offset = 0x080
+description = "Compositor status. Writing 1 to underrun also clears underrun_count."
+
+[[register.field]]
+name = "underrun"
+bits = "0"
+access = "W1C"
+reset = 0
+description = "Sticky: a displayed line was not completely in its line buffer when its scan-out began (the previous contents of the buffer are shown)."
+
+[[register.field]]
+name = "lane_error"
+bits = "1"
+access = "W1C"
+reset = 0
+description = "Sticky: a DDR3 read burst was not granted or not delivered in time and was abandoned."
+
+[[register]]
+name = "underrun_count"
+offset = 0x084
+access = "RO"
+reset = 0
+description = "Number of underrun lines since reset or since underrun was cleared. Counts only while ctrl.enable is 1."
+
+[[register]]
+name = "frame_count"
+offset = 0x088
+access = "RO"
+reset = 0
+description = "Frames shown since reset; increments when the shadow copy is taken (line 1082). A framebuffer swap written before this changes has taken effect once the value has changed twice."
+
+[[register]]
+name = "fb_active"
+offset = 0x08C
+access = "RO"
+reset = 0
+description = "Framebuffer base currently in the shadow copy (the frame being scanned out or about to be). The other buffer is free to draw into."
+
+[[register]]
+name = "wf_zoom_write_line"
+offset = 0x094
+access = "RO"
+reset = 0
+description = "Zoom waterfall writer: index of the last fully written line (0-2,047; 2,047 after reset = none yet)."
+
+[[register]]
+name = "wf_win_ring"
+offset = 0x0A0
+count = 2
+stride = 0x010
+access = "RW"
+reset = 0
+description = "Waterfall window i (0, 1): lane-word address of line 0 of the ring the window shows. To show a hardware writer's ring write the same value as that writer's ring base. Taken at the vertical blank."
+
+[[register]]
+name = "wf_win_ctrl"
+offset = 0x0A4
+count = 2
+stride = 0x010
+description = "Waterfall window i: where its scroll line comes from. The window shows ring line (scroll line - row) mod 2,048 in window row `row`: the newest line at the top."
+
+[[register.field]]
+name = "line_src"
+bits = "1:0"
+access = "RW"
+reset = 0
+description = "0 = wf_write_line (the full-band hardware writer), 1 = wf_zoom_write_line (the zoom hardware writer), 2 = wf_win_line of this window (written by the CPU: a software waterfall). 3 = as 2."
+
+[[register]]
+name = "wf_win_line"
+offset = 0x0A8
+count = 2
+stride = 0x010
+description = "Waterfall window i: the scroll line the CPU writes (used when wf_win_ctrl.line_src = 2). Write the new line's bytes to DDR3 first, then this register. Taken at the vertical blank."
+
+[[register.field]]
+name = "line"
+bits = "10:0"
+access = "RW"
+reset = 0
+description = "Ring line shown in the top row, 0-2,047."
+
+[[register]]
+name = "wf_win_top"
+offset = 0x0AC
+count = 2
+stride = 0x010
+access = "RO"
+reset = 0
+description = "Waterfall window i: ring line shown in its top row in the current frame (the scroll line as latched at the vertical blank)."
+
+[[register]]
+name = "win_scale"
+offset = 0x100
+count = 4
+stride = 0x020
+description = "Spectrum trace vertical scale of window i: row = (ref - level) x gain, level in 1/64 dB as in the spectrum line buffer."
+
+[[register.field]]
+name = "top_level"
+bits = "15:0"
+access = "RW"
+reset = 0
+description = "Level at the top row of the window, signed, 1/64 dB."
+
+[[register.field]]
+name = "gain"
+bits = "31:16"
+access = "RW"
+reset = 0x0100
+description = "Pixels per dB, Q8.8 (0x0100 = 1 pixel per dB). Levels above ref are drawn in the top row, levels below the window in the bottom row."
+
+[[register]]
+name = "win_gridx"
+offset = 0x104
+count = 4
+stride = 0x020
+description = "Vertical grid lines (frequency) of window i, drawn in col_grid over the window."
+
+[[register.field]]
+name = "first"
+bits = "11:0"
+access = "RW"
+reset = 0
+description = "Window column of the first line."
+
+[[register.field]]
+name = "step"
+bits = "27:16"
+access = "RW"
+reset = 0
+description = "Spacing in pixels; 0 = no vertical grid."
+
+[[register]]
+name = "win_gridy"
+offset = 0x108
+count = 4
+stride = 0x020
+description = "Horizontal grid lines (level) of window i; trace windows only."
+
+[[register.field]]
+name = "first"
+bits = "11:0"
+access = "RW"
+reset = 0
+description = "Window row of the first line."
+
+[[register.field]]
+name = "step"
+bits = "27:16"
+access = "RW"
+reset = 0
+description = "Spacing in pixels; 0 = no horizontal grid."
+
+[[register]]
+name = "col_bg"
+offset = 0x180
+description = "Trace window background colour."
+
+[[register.field]]
+name = "rgb"
+bits = "23:0"
+access = "RW"
+reset = 0x000000
+description = "0xRRGGBB."
+
+[[register]]
+name = "col_fill"
+offset = 0x184
+description = "Trace window colour below the trace line."
+
+[[register.field]]
+name = "rgb"
+bits = "23:0"
+access = "RW"
+reset = 0x003060
+description = "0xRRGGBB."
+
+[[register]]
+name = "col_trace"
+offset = 0x188
+description = "Trace line colour."
+
+[[register.field]]
+name = "rgb"
+bits = "23:0"
+access = "RW"
+reset = 0xFFFF00
+description = "0xRRGGBB."
+
+[[register]]
+name = "col_grid"
+offset = 0x18C
+description = "Grid line colour."
+
+[[register.field]]
+name = "rgb"
+bits = "23:0"
+access = "RW"
+reset = 0x606060
+description = "0xRRGGBB."
+
+[[register]]
+name = "cursor_ctrl"
+offset = 0x190
+description = "Tuning cursor: a vertical line across the windows selected by window_mask."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = draw."
+
+[[register.field]]
+name = "window_mask"
+bits = "4:1"
+access = "RW"
+reset = 0
+description = "Bit i set = drawn in window i."
+
+[[register.field]]
+name = "width"
+bits = "11:8"
+access = "RW"
+reset = 1
+description = "Width in pixels (0 counts as 1)."
+
+[[register]]
+name = "cursor_x"
+offset = 0x194
+description = "Cursor left edge, screen pixels."
+
+[[register.field]]
+name = "x"
+bits = "11:0"
+access = "RW"
+reset = 0
+description = "Screen x."
+
+[[register]]
+name = "cursor_col"
+offset = 0x198
+description = "Cursor colour."
+
+[[register.field]]
+name = "rgb"
+bits = "23:0"
+access = "RW"
+reset = 0xFF0000
+description = "0xRRGGBB."
+
+[[register]]
+name = "pb_range"
+offset = 0x200
+count = 8
+stride = 0x010
+description = "Receiver passband k: screen columns x0 <= x < x1."
+
+[[register.field]]
+name = "x0"
+bits = "11:0"
+access = "RW"
+reset = 0
+description = "First screen column."
+
+[[register.field]]
+name = "x1"
+bits = "27:16"
+access = "RW"
+reset = 0
+description = "One past the last screen column."
+
+[[register]]
+name = "pb_ctrl"
+offset = 0x204
+count = 8
+stride = 0x010
+description = "Receiver passband k: where the lowest-numbered enabled passband covering a pixel blends its colour over the picture."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = draw."
+
+[[register.field]]
+name = "window_mask"
+bits = "4:1"
+access = "RW"
+reset = 0
+description = "Bit i set = drawn in window i."
+
+[[register.field]]
+name = "alpha"
+bits = "12:8"
+access = "RW"
+reset = 8
+description = "Opacity in sixteenths, 0-16 (larger values count as 16)."
+
+[[register]]
+name = "pb_col"
+offset = 0x208
+count = 8
+stride = 0x010
+description = "Receiver passband k colour."
+
+[[register.field]]
+name = "rgb"
+bits = "23:0"
+access = "RW"
+reset = 0x00A0FF
+description = "0xRRGGBB."

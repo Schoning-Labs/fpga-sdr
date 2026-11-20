@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Noise reduction and noise blanker toggles, each with its level shown while it is on
+// (docs/ARCHITECTURE.md 5.2).
+
+import { Theme } from "theme.slint";
+import { PanelModel } from "../model.slint";
+
+component Toggle inherits Rectangle {
+    in property <string> label: "";
+    in property <bool> enabled: false;
+    in property <int> level: 0;
+    in property <bool> compact: false;
+    callback toggled();
+
+    background: enabled ? Theme.button-active : Theme.button-idle;
+    border-width: 1px;
+    border-color: enabled ? Theme.accent : Theme.panel-frame-active;
+    border-radius: 3px;
+    min-width: compact ? 44px : 72px;
+    min-height: compact ? 20px : 32px;
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 4px;
+        Text {
+            text: label;
+            color: enabled ? Theme.text-primary : Theme.text-dim;
+            font-size: compact ? 9px : 13px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: level;
+            color: Theme.text-dim;
+            font-size: compact ? 8px : 11px;
+            vertical-alignment: center;
+            visible: enabled;
+        }
+    }
+    TouchArea {
+        clicked => { root.toggled(); }
+    }
+}
+
+export component NrNbControl inherits Rectangle {
+    in property <bool> compact: false;
+
+    HorizontalLayout {
+        spacing: compact ? 2px : 4px;
+        Toggle {
+            label: "NR";
+            enabled: PanelModel.nr-enabled;
+            level: PanelModel.nr-level;
+            compact: compact;
+            toggled => { PanelModel.request-nr-toggle(); }
+        }
+        Toggle {
+            label: "NB";
+            enabled: PanelModel.nb-enabled;
+            level: PanelModel.nb-level;
+            compact: compact;
+            toggled => { PanelModel.request-nb-toggle(); }
+        }
+    }
+}

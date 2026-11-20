@@ -1,0 +1,114 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# DRAFT (see [block].status below): base address is fixed (docs/ARCHITECTURE.md 4.1), but the
+# register layout is a first cut at section 3.6, not checked against any RTL yet.
+# Whoever builds the transmit chain should edit this file (and flip status to "final")
+# once the chain's real register port exists. **No transmitting**: nothing in this draft sets
+# the HL2's key bit or selects the real DAC (docs/PLAN.md rule, CLAUDE.md); `enable` here only
+# gates whether the FPGA chain feeds real samples into the framer instead of the framer sending
+# zeros (ARCHITECTURE 3.6 item 5) -- the HL2's own interlock and echo/virtual-DAC register
+# (0x31, PROTOCOL 6.5) are firmware/HL2-side, not in this block.
+
+[block]
+name = "tx"
+base = 0xE808_0000
+size = 0x0001_0000
+status = "draft"
+description = """
+TX chain (docs/ARCHITECTURE.md 3.6): baseband ring pointers, interpolate/CORDIC up-mix enable
+and gain, NCO phase increment, and rate-trim status. The framer that actually sends TX frames
+to the HL2 is in the hl2_link block (0xE801_0000, tx_ctrl/tx_fifo_fill/tx_trim); this block is
+the DSP chain feeding it.
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x5458_0001
+description = "Block identifier/version: 'TX' + version 1 (set by the chip top level)."
+
+[[register]]
+name = "ctrl"
+offset = 0x004
+description = "Chain enable."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = chain outputs real samples from the ring; 0 = chain outputs zero (ARCHITECTURE 3.6 item 5). This gates the FPGA DSP chain only -- it never sets the HL2's key bit or selects the real DAC; see CLAUDE.md and docs/DECISIONS.md."
+
+[[register]]
+name = "gain"
+offset = 0x008
+description = "Output gain before the 12-bit round (ARCHITECTURE 3.6 item 2)."
+
+[[register.field]]
+name = "value"
+bits = "15:0"
+access = "RW"
+reset = 0
+description = "Unsigned gain, Q8.8 fixed point."
+
+[[register]]
+name = "nco_phase_inc"
+offset = 0x00C
+description = "CORDIC up-mix frequency, same format as the receiver bank's phase_inc (docs/ARCHITECTURE.md 3.2, 3.6)."
+
+[[register.field]]
+name = "value"
+bits = "31:0"
+access = "RW"
+reset = 0
+description = "Signed 32-bit phase increment, round(f_Hz / 76.8e6 * 2^32)."
+
+[[register]]
+# The chip's register block (rtl/top/block_regs.v, tx_regs) resets this register to 0, not to the value below; the firmware writes the ring address before it starts the transmit chain. The value stays as a documented default because it generates constants.
+name = "ring_base"
+offset = 0x010
+access = "RW"
+reset = 0x1200_0000
+description = "Baseband ring base address in DDR3 (docs/ARCHITECTURE.md 5.4)."
+
+[[register]]
+name = "ring_size"
+offset = 0x014
+access = "RW"
+reset = 0
+description = "Ring size in complex sample frames (power of two)."
+
+[[register]]
+name = "ring_wptr"
+offset = 0x018
+access = "RW"
+reset = 0
+description = "Write pointer, in frames. Written by firmware after it writes back the new samples' cache lines (docs/ARCHITECTURE.md 4.2, CPU-written ring)."
+
+[[register]]
+name = "ring_rptr"
+offset = 0x01C
+access = "RO"
+reset = 0
+description = "Read pointer, in frames. Updated by the fabric consumer."
+
+[[register]]
+name = "status"
+offset = 0x020
+description = "Rate-trim direction and sticky low-water flag, matching fabric interrupt line 4 (ARCHITECTURE 4.3)."
+
+[[register.field]]
+name = "low_water"
+bits = "0"
+access = "W1C"
+reset = 0
+description = "Set when the ring fill drops below the low-water mark; cleared by firmware writing 1 after refilling."
+
+[[register.field]]
+name = "trimming_up"
+bits = "1"
+access = "RO"
+reset = 0
+description = "1 = the rate-trim loop is currently repeating a sample to hold the HL2 TX FIFO fill near its target (ARCHITECTURE 3.6 item 3)."

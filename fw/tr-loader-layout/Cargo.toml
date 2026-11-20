@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# The loader's flash layout and write guard (docs/C2_LOADER.md "Flash layout"): pure
+# arithmetic, no hardware, so it is tested on the host. fw/tr-loader re-exports it as `layout`
+# and drives the real chip through the same generic write/erase functions the tests drive on a
+# model chip.
+
+[package]
+name = "tr-loader-layout"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "stage-0 loader: flash layout, CPU-address mapping, erase/write guard"
+
+[dependencies]

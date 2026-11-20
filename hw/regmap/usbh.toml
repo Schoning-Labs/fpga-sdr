@@ -1,0 +1,431 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[block]
+name = "usbh"
+base = 0xE80F_0000
+size = 0x0001_0000
+status = "final"
+description = """
+USB host on the Pmod board (docs/USB_HOST.md, rtl/usbh/usbh_regs.v): two ports, full and low speed. The
+logic keeps the frames going and does one transaction at a time for the firmware; the firmware (fw/tr-usbh)
+does the rest. Registers at 0x100 belong to port 0 (the board's USB1), the same at 0x200 to port 1 (USB2).
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x5548_0001
+description = "Block identifier/version: 'UH' + version 1."
+
+[[register]]
+name = "ctrl"
+offset = 0x004
+description = "Switches for both ports."
+
+[[register.field]]
+name = "swap"
+bits = "0"
+access = "RW"
+reset = 0
+description = "0 = the dock's odd pin row (pins 9, 11) is D-, the even row (10, 12) is D+. 1 = the other way round (the board sits the other way up)."
+
+[[register.field]]
+name = "irq_rx"
+bits = "8"
+access = "RW"
+reset = 0
+description = "1 = interrupt line 13 is high while a receive FIFO holds something."
+
+[[register.field]]
+name = "irq_done"
+bits = "9"
+access = "RW"
+reset = 0
+description = "1 = interrupt line 13 is high while a port's ev_done is set."
+
+[[register.field]]
+name = "irq_line"
+bits = "10"
+access = "RW"
+reset = 0
+description = "1 = interrupt line 13 is high while a port's ev_line is set."
+
+[[register]]
+name = "spk"
+offset = 0x010
+description = "Speaker stream (isochronous OUT): the radio's 48 kHz stream, one packet per frame."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = send. Write the other fields first."
+
+[[register.field]]
+name = "port"
+bits = "1"
+access = "RW"
+reset = 0
+description = "The port the device is on."
+
+[[register.field]]
+name = "ep"
+bits = "5:2"
+access = "RW"
+reset = 0
+description = "Endpoint number."
+
+[[register.field]]
+name = "mono"
+bits = "6"
+access = "RW"
+reset = 0
+description = "1 = one channel, (left + right) / 2. 0 = two channels."
+
+[[register.field]]
+name = "bytes3"
+bits = "7"
+access = "RW"
+reset = 0
+description = "1 = 3-byte samples (the low byte 0). 0 = 2-byte samples."
+
+[[register.field]]
+name = "max_samples"
+bits = "13:8"
+access = "RW"
+reset = 48
+description = "Most samples per frame (the endpoint's packet size / bytes per sample frame, 49 at most)."
+
+[[register]]
+name = "mic"
+offset = 0x014
+description = "Microphone stream (isochronous IN): one IN per frame, the samples go to the speech FIFO of page usb (usb.ctrl.speech_src)."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = ask for a packet every frame. Write the other fields first."
+
+[[register.field]]
+name = "port"
+bits = "1"
+access = "RW"
+reset = 0
+description = "The port the device is on."
+
+[[register.field]]
+name = "ep"
+bits = "5:2"
+access = "RW"
+reset = 0
+description = "Endpoint number."
+
+[[register.field]]
+name = "mono"
+bits = "6"
+access = "RW"
+reset = 0
+description = "1 = one channel, copied to left and right. 0 = two channels."
+
+[[register.field]]
+name = "bytes3"
+bits = "7"
+access = "RW"
+reset = 0
+description = "1 = 3-byte samples, the upper two bytes are used. 0 = 2-byte samples."
+
+[[register]]
+name = "audio_status"
+offset = 0x018
+description = "Audio counters, wrapping."
+
+[[register.field]]
+name = "spk_fill"
+bits = "7:0"
+access = "RO"
+reset = 0
+description = "Samples waiting in the speaker buffer (0 to 128; about 48 at the start of a frame)."
+
+[[register.field]]
+name = "spk_overruns"
+bits = "15:8"
+access = "RO"
+reset = 0
+description = "Speaker samples dropped because the buffer was full."
+
+[[register.field]]
+name = "mic_bad_packets"
+bits = "31:16"
+access = "RO"
+reset = 0
+description = "Microphone packets dropped (bad CRC, damaged)."
+
+[[register]]
+name = "mic_count"
+offset = 0x01C
+access = "RO"
+reset = 0
+description = "Microphone samples received since reset (wraps): read twice a known time apart for the device's true rate."
+
+[[register]]
+name = "port_ctrl"
+offset = 0x100
+count = 2
+stride = 0x100
+description = "One port. A write also clears `gone`."
+
+[[register.field]]
+name = "mode"
+bits = "2:0"
+access = "RW"
+reset = 0
+description = "0 = off (lines released). 1 = reset (both lines driven low). 2 = run (SOF or keep-alive every ms, transactions). 3 = suspend (no SOF). 4 = resume (K driven; go to 2 after 20 ms, the logic adds the low-speed EOP)."
+
+[[register.field]]
+name = "low_speed"
+bits = "3"
+access = "RW"
+reset = 0
+description = "1 = low speed (1.5 Mbit/s): the device pulls D- up. 0 = full speed."
+
+[[register.field]]
+name = "address"
+bits = "10:4"
+access = "RW"
+reset = 0
+description = "The device's address in every token of this port."
+
+[[register]]
+name = "port_status"
+offset = 0x104
+count = 2
+stride = 0x100
+description = "State of one port. Reading clears ev_line and ev_done."
+
+[[register.field]]
+name = "dp"
+bits = "0"
+access = "RO"
+reset = 0
+description = "D+ as read (after `swap`), steady for 0.5 ms."
+
+[[register.field]]
+name = "dn"
+bits = "1"
+access = "RO"
+reset = 0
+description = "D- as read (after `swap`), steady for 0.5 ms."
+
+[[register.field]]
+name = "gone"
+bits = "2"
+access = "RO"
+reset = 0
+description = "1 = both lines were low for 85 us while running: the device is gone, the port has stopped. Cleared by leaving mode 2."
+
+[[register.field]]
+name = "busy"
+bits = "3"
+access = "RO"
+reset = 0
+description = "1 = the transaction written to `xfer` is not finished."
+
+[[register.field]]
+name = "result"
+bits = "6:4"
+access = "RO"
+reset = 0
+description = "Result of the last transaction: 1 done, 2 NAK for nak_limit frames, 3 STALL, 4 no answer three times, 5 damaged three times, 6 the port was not running."
+
+[[register.field]]
+name = "rx_any"
+bits = "7"
+access = "RO"
+reset = 0
+description = "1 = the receive FIFO holds something."
+
+[[register.field]]
+name = "ev_line"
+bits = "8"
+access = "RO"
+reset = 0
+description = "1 = dp, dn or gone changed since the last read."
+
+[[register.field]]
+name = "ev_done"
+bits = "9"
+access = "RO"
+reset = 0
+description = "1 = a transaction finished since the last read."
+
+[[register.field]]
+name = "slot_err"
+bits = "11:10"
+access = "RO"
+reset = 0
+description = "Bit n = interrupt slot n has stopped: STALL, or three polls without a proper answer. Cleared by switching the slot off."
+
+[[register.field]]
+name = "frame"
+bits = "26:16"
+access = "RO"
+reset = 0
+description = "Frame number of the last SOF."
+
+[[register]]
+name = "xfer"
+offset = 0x108
+count = 2
+stride = 0x100
+description = "The firmware's transaction. Writing starts it (fill tx first); port_status.busy until it is finished."
+
+[[register.field]]
+name = "kind"
+bits = "1:0"
+access = "RW"
+reset = 0
+description = "0 = SETUP (8 bytes from tx), 1 = OUT (len bytes from tx), 2 = IN (the data arrives as a record in the receive FIFO)."
+
+[[register.field]]
+name = "ep"
+bits = "5:2"
+access = "RW"
+reset = 0
+description = "Endpoint number."
+
+[[register.field]]
+name = "toggle"
+bits = "6"
+access = "RW"
+reset = 0
+description = "Data toggle: the PID sent (SETUP: 0), or the one expected."
+
+[[register.field]]
+name = "len"
+bits = "13:7"
+access = "RW"
+reset = 0
+description = "Bytes to send, 0 to 64."
+
+[[register.field]]
+name = "nak_limit"
+bits = "23:16"
+access = "RW"
+reset = 0
+description = "Frames to go on trying while the device answers NAK; 0 = for ever (stop by leaving mode 2)."
+
+[[register]]
+name = "rx_pop"
+offset = 0x10C
+count = 2
+stride = 0x100
+description = "The oldest word of the receive FIFO; reading takes it out. A record is its data bytes and then one end word."
+
+[[register.field]]
+name = "data"
+bits = "7:0"
+access = "RO"
+reset = 0
+description = "A data byte; in the end word the source: 0 = the IN transaction of `xfer`, 1 = interrupt slot 0, 2 = slot 1."
+
+[[register.field]]
+name = "end"
+bits = "8"
+access = "RO"
+reset = 0
+description = "1 = this is the end word of a record."
+
+[[register.field]]
+name = "valid"
+bits = "31"
+access = "RO"
+reset = 0
+description = "0 = the FIFO was empty, nothing was taken."
+
+[[register]]
+name = "slot"
+offset = 0x110
+count = 2
+stride = 0x004
+description = "Port 0's two interrupt-IN polls. (Port 1's are `slot1` at 0x210.)"
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = poll. Switching off clears the slot's toggle and fault."
+
+[[register.field]]
+name = "ep"
+bits = "4:1"
+access = "RW"
+reset = 0
+description = "Endpoint number."
+
+[[register.field]]
+name = "interval"
+bits = "12:5"
+access = "RW"
+reset = 10
+description = "Frames (ms) between polls, 1 to 255."
+
+[[register]]
+name = "rx_level"
+offset = 0x120
+count = 2
+stride = 0x100
+access = "RO"
+reset = 0
+description = "Words waiting in the receive FIFO, 0 to 1,024."
+
+[[register]]
+name = "tx"
+offset = 0x140
+count = 16
+stride = 0x004
+access = "RW"
+reset = 0
+description = "Port 0: the 64 bytes to send, byte 0 in bits 7:0 of word 0. Write only (reads 0). Port 1: 0x240."
+
+[[register]]
+name = "slot1"
+offset = 0x210
+count = 2
+stride = 0x004
+description = "Port 1's interrupt slots (fields as `slot`)."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = poll."
+
+[[register.field]]
+name = "ep"
+bits = "4:1"
+access = "RW"
+reset = 0
+description = "Endpoint number."
+
+[[register.field]]
+name = "interval"
+bits = "12:5"
+access = "RW"
+reset = 10
+description = "Frames (ms) between polls, 1 to 255."
+
+[[register]]
+name = "tx1"
+offset = 0x240
+count = 16
+stride = 0x004
+access = "RW"
+reset = 0
+description = "Port 1: the 64 bytes to send. Write only (reads 0)."

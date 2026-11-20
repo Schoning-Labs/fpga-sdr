@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Linker setup for the AE350 target. riscv-rt's `link.x` needs `memory.x`
+# (produced by fw/tr-ae350/build.rs) on the search path and linked in first. This file only
+# takes effect for the riscv32imafc target; host builds (cargo test) are unaffected.
+
+[target.riscv32imafc-unknown-none-elf]
+rustflags = [
+    "-C", "link-arg=-Tmemory.x",
+    "-C", "link-arg=-Tlink.x",
+    # The A25 has the D (double-precision) FPU (docs/BOARD.md); the riscv32imafc target does not use
+    # it by default, so every f64 operation became a software library call. mfsk-core's FT8 decode
+    # spends about 70 % of its instructions in f64 arithmetic: with this flag its decode of a busy
+    # slot drops from 2.97 G to 0.89 G instructions (docs/CPU_BUDGET.md section 5). The ABI stays
+    # ilp32f (doubles still passed in integer registers), so the precompiled `core` links unchanged.
+    # rustc prints "unstable feature specified for -Ctarget-feature: d"; the flag works on stable.
+    # Any trap handler that saves FP registers must save them 64 bits wide (fsd/fld).
+    "-C", "target-feature=+d",
+    # No atomic read-modify-write instructions (owner 2026-10-21; an `amoadd` stopped the
+    # AE350's processor at its first execution). The A extension is switched off for our code, so portable-atomic
+    # (Slint's reference counts in `vtable::VRc` use it) takes its single-core path (interrupts off around the
+    # update; tr-app enables `unsafe-assume-single-core`). The precompiled `core` is not rebuilt: check the
+    # disassembly (tools/check_no_amo.sh) after every firmware build.
+    "-C", "target-feature=-a",
+]

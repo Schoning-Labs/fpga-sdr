@@ -1,0 +1,85 @@
+fpga-sdr
+Copyright 2026 Franz Schöning, https://www.schoning.com
+
+The files written by Franz Schöning are licensed under the Apache License, Version 2.0 (file LICENSE).
+The folders and files listed below come from other projects, or follow code from other projects, and keep
+their own licenses. They are not Apache-2.0, and code copied out of them keeps the license of the folder it
+came from. docs/learn/LICENSES.md explains each one.
+
+
+Third-party parts in this repository
+------------------------------------
+
+fw/vendor/mfsk-core/
+  mfsk-core 0.11.0, Copyright Naoki Sakurai (JL1NIE) and contributors, https://github.com/jl1nie/mfsk-core
+  GNU General Public License version 3 or later (fw/vendor/mfsk-core/LICENSE).
+  Modified for this project; the changes are listed in fw/vendor/VENDOR_PATCH.md.
+  mfsk-core implements the decoders of WSJT-X by Joe Taylor K1JT and the WSJT development team
+  (https://wsjt.sourceforge.io, GNU General Public License version 3 or later).
+
+fw/tr-modes/src/frontend/candidates.rs, fw/tr-modes/src/frontend/decode.rs, fw/tr-modes/src/txbb.rs
+  Parts of the FT8 decoder and the FT8 transmit waveform that follow routines of WSJT-X and mfsk-core.
+  They keep the header GPL-3.0-or-later, with the note "modified 2026 by Franz Schöning" in each file,
+  and are GPL-3.0-or-later, not Apache-2.0.
+
+fw/tr-codec2/, fw/tr-freedv/
+  Rust translations of parts of Codec 2 release 1.2.0 and the FreeDV 700D/700E modes,
+  Copyright David Rowe and contributors, https://github.com/drowe67/codec2, with LDPC code by
+  Matthew C. Valenti, Rohit Iyer Seshadri and David Rowe, LDPC codes by Bill Cowley VK5DSP, and the
+  PSK31 varicode table. GNU Lesser General Public License version 2.1 (COPYING.LGPL-2.1 and NOTICE
+  in each folder). Translated by Franz Schöning, 2026. The test vectors in their tests folders were
+  made by the C reference programs of Codec 2 and FreeDV from the speech files of those projects.
+
+rtl/vendor/hdmi/
+  hdl-util/hdmi, Copyright 2019 Sameer Puri and contributors, https://github.com/hdl-util/hdmi
+  MIT License or Apache License 2.0 (LICENSE-MIT, LICENSE-APACHE), used here under the Apache License 2.0.
+  Three files modified, each with a note saying what was changed.
+
+sim/h1_link_rx/hl2/, sim/h2_link_tx/hl2/
+  Ethernet send and receive modules from Hermes-Lite 2 (HPSDR Metis code by Alex Shovkoplyas VE3NEA,
+  Phil Harman VK6APH, Steve Haynal KF7O, James Ahlstrom and others, https://github.com/softerhardware/Hermes-Lite2),
+  and the raw stream sender and receiver model written by Franz Schöning for his Hermes-Lite 2 fork
+  (https://github.com/Schoning-Labs/Hermes-Lite2, branch hl2-rawfront-release), which is released there under the
+  same license as the rest of Hermes-Lite 2. Simulation only.
+  GNU General Public License version 2 or later (LICENSE in each folder).
+
+rtl/rx/cic_*.v, rtl/tx/CicInterpM5.v, fw/tr-rxmodel/src/cic.rs, sim/rx/ref/cic_*.v
+  The CIC filters of the radio, their Rust model and the reference copies of the receive filters in
+  sim/rx/ref were written from specifications of their behavior (clean-room rewrites) and checked bit
+  for bit against the earlier Hermes-Lite and HPSDR filters in simulation. They are Apache-2.0.
+
+
+Attributions for Apache-2.0 material
+------------------------------------
+
+Some pin and clock constraints (gowin/p1/sdr.cst, gowin/p1/sdr.sdc, gowin/ladder/), the
+SerDes parameter files (gowin/p1/ip/serdes/) and the DDR3 settings (hw/gowin/mem/gwmc_param.v)
+follow the Tang Mega 138K Pro examples by Sipeed (Shenzhen Sipeed Technology Co., Ltd.), licensed
+under the Apache License 2.0.
+
+
+Not in this repository
+----------------------
+
+Slint (SixtyFPS GmbH, https://slint.dev) is fetched by Cargo when the firmware is built. It is used under the
+GNU General Public License version 3 only.
+
+The test recordings (WSJT-X sample recordings, Codec 2 speech files, FreeDV sample signals) are fetched by
+tools/fetch_test_audio.sh and tools/fetch_freedv_test.sh from their own projects and are not part of this
+repository. The FT8 test vectors are made from the WSJT-X recordings by tools/make_ft8_vectors.sh at test time.
+
+
+Built firmware and bitstream
+----------------------------
+
+The firmware image built from fw/ is one combined work. It contains Slint (used under the GNU General Public
+License version 3 only), mfsk-core and the FT8 files listed above (GPL-3.0 or later), and tr-codec2 and
+tr-freedv (used under the GPL by section 3 of the LGPL 2.1). A firmware image is therefore distributed under
+the GNU General Public License version 3, and its complete source is this repository at the same commit
+together with the crates named in fw/Cargo.lock. The image also contains crates under the MIT, Apache-2.0, BSD,
+Zlib and 0BSD licenses, whose notices must accompany it.
+
+A bitstream built from rtl/ contains Gowin Semiconductor's encrypted IP (the AE350 RISC-V SoC with its Andes
+core, the DDR3 memory controller and the SerDes PHY), which is not part of this repository and is generated from
+a licensed Gowin EDA installation under Gowin's own terms. No bitstream and no firmware image is distributed
+with this repository.

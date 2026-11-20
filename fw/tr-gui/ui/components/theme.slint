@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Shared colors and the one constant every FPGA window must use exactly: the compositor key
+// color (docs/ARCHITECTURE.md 3.5), RGB565 0xF81F, which is full-intensity magenta at 24-bit
+// precision (0xFF00FF). Red 0xFF >> 3 = 0x1F, green 0x00 >> 2 = 0 and blue 0xFF >> 3 = 0x1F
+// survive the RGB565 conversion of the software renderer without loss, so this exact color is
+// what reaches the framebuffer unmodified. Nothing may be drawn on top of it inside an
+// `FpgaWindow` (fpga_window.slint). Every other color of the screens is defined here too.
+
+export global Theme {
+    out property <color> key-colour: #ff00ff;
+
+    out property <color> panel-background: #14181f;
+    out property <color> panel-frame: #262c38;
+    out property <color> panel-frame-active: #3a4356;
+    out property <color> text-primary: #e6ecf5;
+    out property <color> text-dim: #8a93a6;
+    out property <color> accent: #3fa9f5;
+    out property <color> accent-warn: #f5a93f;
+    out property <color> accent-bad: #f53f4f;
+    out property <color> accent-good: #3ff58a;
+    out property <color> button-idle: #1c212b;
+    out property <color> button-active: #2a5a8f;
+}

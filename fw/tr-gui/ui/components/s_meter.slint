@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// S-meter for the active receiver. `s-meter-db` drives the bar fill; -127 to +20 dBm is the range
+// shown (S0 up to 93 dB over S9), clamped here only for drawing and never adjusted otherwise.
+// Scale marks at S1, S3, S5, S7, S9 and +20/+40/+60 dB above S9 match a conventional analog meter
+// face. The label, the numeric readouts and the bar are kept in one tight block with no gap
+// between them.
+
+import { Theme } from "theme.slint";
+import { PanelModel } from "../model.slint";
+
+export component SMeter inherits Rectangle {
+    in property <bool> compact: false;
+    property <float> db-clamped: max(-127, min(20, PanelModel.s-meter-db));
+    property <float> fraction: (db-clamped + 127) / 147;
+    property <length> bar-height: compact ? 10px : 16px;
+
+    // S1/3/5/7/9 = -127 + 6*n dBm (S0 = -127, 6 dB/S-unit); +20/+40/+60 = that many dB above S9
+    // (-73 dBm). Fraction is each value's position across the -127..+20 dBm range drawn above.
+    property <[{frac: float, label: string}]> ticks: [
+        { frac: 0.0408, label: "1" },
+        { frac: 0.1224, label: "3" },
+        { frac: 0.2041, label: "5" },
+        { frac: 0.2857, label: "7" },
+        { frac: 0.3673, label: "9" },
+        { frac: 0.5034, label: "+20" },
+        { frac: 0.6395, label: "+40" },
+        { frac: 0.7755, label: "+60" },
+    ];
+
+    VerticalLayout {
+        spacing: 1px;
+
+        HorizontalLayout {
+            spacing: compact ? 3px : 6px;
+            Text {
+                text: "S-meter";
+                color: Theme.text-dim;
+                font-size: compact ? 9px : 11px;
+                vertical-alignment: center;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text {
+                text: PanelModel.s-meter-text;
+                color: Theme.accent;
+                font-size: compact ? 10px : 13px;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+            Text {
+                text: PanelModel.s-meter-dbm-text;
+                color: Theme.text-dim;
+                font-size: compact ? 8px : 11px;
+                vertical-alignment: center;
+            }
+        }
+
+        Rectangle {
+            height: bar-height;
+            background: Theme.button-idle;
+            border-width: 1px;
+            border-color: Theme.panel-frame-active;
+
+            Rectangle {
+                x: 0;
+                y: 0;
+                height: parent.height;
+                width: parent.width * fraction;
+                background: db-clamped > -73 ? Theme.accent-warn : Theme.accent-good;
+            }
+
+            for t in ticks: Rectangle {
+                x: parent.width * t.frac;
+                y: 0;
+                width: 1px;
+                height: parent.height;
+                background: Theme.panel-frame;
+            }
+        }
+
+        Rectangle {
+            height: compact ? 9px : 12px;
+            for t in ticks: Text {
+                x: parent.width * t.frac - 9px;
+                y: 0;
+                width: 18px;
+                text: t.label;
+                color: Theme.text-dim;
+                font-size: compact ? 6px : 8px;
+                horizontal-alignment: center;
+            }
+        }
+    }
+}

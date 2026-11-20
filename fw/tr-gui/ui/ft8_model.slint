@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// State of the FT8 operating screen (docs/P2_FT8_FW.md). Written from `tr_gui::ft8::Ft8ScreenState`
+// after every change; the `request-*` callbacks only report what the operator did. No radio logic
+// here: a click on "TX" asks for transmitting to be enabled, the firmware decides and writes
+// `tx-enabled` back.
+
+export struct Ft8Row {
+    utc-text: string,
+    snr-text: string,
+    dt-text: string,
+    freq-text: string,
+    message-text: string,
+    // 0 = other traffic, 1 = someone calling CQ, 2 = a message to us, 3 = our own transmission
+    kind: int,
+}
+
+export global Ft8Model {
+    in-out property <[string]> band-names: ["160", "80", "60", "40", "30", "20", "17", "15", "12", "10"];
+    in-out property <int> band-index: 5;
+    in-out property <string> dial-text: "14.074.000";
+
+    in-out property <string> utc-text: "--:--:--";
+    // 0 = no network time, 1 = waiting for the first answer, 2 = synchronized
+    in-out property <int> clock-level: 0;
+    in-out property <string> clock-text: "no network time";
+    // 0..1 through the 15 s slot
+    in-out property <float> slot-progress: 0;
+    // The current slot is one of ours to transmit in.
+    in-out property <bool> slot-is-ours: false;
+
+    // TX is off until the operator switches it on here.
+    in-out property <bool> tx-enabled: false;
+    in-out property <bool> transmitting: false;
+    // true = we transmit in the slots that start at second 00 and 30
+    in-out property <bool> tx-first: true;
+    in-out property <int> tx-audio-hz: 1500;
+    in-out property <int> rx-audio-hz: 1500;
+    in-out property <string> tx-message: "";
+    in-out property <string> qso-text: "idle";
+    in-out property <string> my-call: "";
+    in-out property <string> link-text: "HL2: no link";
+    in-out property <bool> link-ok: false;
+
+    // Newest first.
+    in-out property <[Ft8Row]> decodes: [];
+
+    callback request-band-select(int);
+    callback request-tx-enable-toggle();
+    callback request-cq();
+    callback request-halt();
+    callback request-decode-click(int);
+    callback request-tx-parity-toggle();
+    // TX audio frequency in Hz, from a click on the frequency scale
+    callback request-tx-freq(int);
+    // Go to the FreeDV screen (the firmware switches TX off first)
+    callback request-switch-to-freedv();
+    // Go to the LISTEN screen (the firmware switches TX off first)
+    callback request-switch-to-listen();
+}

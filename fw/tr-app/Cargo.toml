@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "tr-app"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Firmware top level: memory layout, interrupts, heap, screen, network glue and the firmware binaries"
+
+[dependencies]
+tr-ae350 = { path = "../tr-ae350", default-features = false }
+riscv = "0.16"
+riscv-rt = { version = "0.18", features = ["single-hart"] }
+# The firmware image (docs/P2_FT8_FW.md).
+tr-regs = { path = "../tr-regs" }
+tr-fabric = { path = "../tr-fabric" }
+# Network time over the RJ45 unit (src/rj45net.rs)
+tr-net = { path = "../tr-net", default-features = false }
+tr-station = { path = "../tr-station" }
+tr-gui = { path = "../tr-gui" }
+tr-usbh = { path = "../tr-usbh" }
+# PC mouse and keyboard over UDP (src/netinput.rs, docs/NETINPUT.md)
+tr-input = { path = "../tr-input" }
+# the yield hook of the long decodes (re-exported from the vendored mfsk-core)
+tr-modes = { path = "../tr-modes", default-features = false, features = ["ft8", "fft-portable"] }
+slint = { version = "1.18.1", default-features = false, features = ["compat-1-2", "unsafe-single-threaded", "libm", "renderer-software"] }
+
+[features]
+# See fw/tr-ae350/Cargo.toml for what these select. The default of tr-app forwards to the default of
+# tr-ae350 (board-ae350), so that `cargo build -p tr-app` with no flags matches every other crate in the
+# workspace; tools/qemu_c1.sh passes `--no-default-features --features board-qemu`.
+default = ["board-ae350"]
+board-ae350 = ["tr-ae350/board-ae350"]
+board-qemu = ["tr-ae350/board-qemu", "tr-station/selftest", "tr-fabric/mock"]
+# Embeds the HL2's message-layer program (msg.bin) so that the radio can load it into the HL2 CPU's RAM
+# (docs/HL2_CONTROL.md). build.rs switches it on by itself when the environment variable HL2_MSG_BIN
+# names the file; naming it here without HL2_MSG_BIN stops the build with a message.
+hl2-msg-load = []
+
+# Smoke test under QEMU, built with the QEMU board-support feature, which swaps in the UART, PLIC and
+# CLINT addresses of QEMU. `required-features` keeps this bin out of the normal board-ae350 build entirely
+# (the `-p tr-app` line of tools/check.sh, and `cargo build` or `cargo test` with no flags), so it exists
+# only for `cargo build --bin qemu_smoke --no-default-features --features board-qemu`, which
+# tools/qemu_c1.sh runs.
+[[bin]]
+name = "qemu_smoke"
+path = "src/bin/qemu_smoke.rs"
+required-features = ["board-qemu"]
+
+# Test run by tools/qemu_c4.sh: a real machine-timer interrupt handler firing repeatedly during an f64
+# loop in the main task must leave the result of that loop bit-identical to a run with no interrupts at
+# all, and a handler that deliberately tries to use the FPU must be caught (illegal instruction) and
+# not silently corrupt the FP registers of the interrupted task.
+[[bin]]
+name = "qemu_c4"
+path = "src/bin/qemu_c4.rs"
+required-features = ["board-qemu"]
+
+# The firmware for the board (docs/P2_FT8_FW.md section 5), built by a plain
+# `cargo build --target riscv32imafc-unknown-none-elf -p tr-app`.
+[[bin]]
+name = "ft8fw"
+path = "src/bin/ft8fw.rs"
+required-features = ["board-ae350"]
+
+# The same firmware code under QEMU against a simulated fabric (fw/tr-app/qemu_p2.sh): the screen is
+# rendered and clicked, and a CQ is sent through the TX ring and decoded back through the receive path.
+[[bin]]
+name = "ft8fw_qemu"
+path = "src/bin/ft8fw_qemu.rs"
+required-features = ["board-qemu"]

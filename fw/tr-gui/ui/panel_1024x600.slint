@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Front panel at 1024x600 (docs/DECISIONS.md: a small LCD panel option, docs/ARCHITECTURE.md
+// 3.5). Same `ui/components/*.slint` files as `panel_1920x1080.slint`, every one switched to its
+// `compact` layout, with a narrower sidebar, since there is no room for two wide columns at
+// this size. State comes from `PanelModel` (model.slint).
+
+import { Theme } from "components/theme.slint";
+import { FpgaWindow } from "components/fpga_window.slint";
+// Re-exported for the generated Rust code, see panel_1920x1080.slint.
+export { PanelModel, RxSliceInfo, Ft8DecodeInfo } from "model.slint";
+import { FrequencyDisplay } from "components/frequency_display.slint";
+import { BandButtons } from "components/band_buttons.slint";
+import { ModeButtons } from "components/mode_buttons.slint";
+import { AgcControl } from "components/agc_control.slint";
+import { FilterWidth } from "components/filter_width.slint";
+import { NrNbControl } from "components/nr_nb_control.slint";
+import { RxSliceList } from "components/rx_slice_list.slint";
+import { TxControls } from "components/tx_controls.slint";
+import { N2adrIndicator } from "components/n2adr_indicator.slint";
+import { SMeter } from "components/s_meter.slint";
+import { DigitalPanel } from "components/digital_panel.slint";
+import { MenuBar } from "components/menu_bar.slint";
+
+export component MainWindow1024x600 inherits Window {
+    width: 1024px;
+    height: 600px;
+    background: Theme.panel-background;
+
+    VerticalLayout {
+        padding: 4px;
+        spacing: 4px;
+
+        // Top bar. Relatively taller than the 1920x1080 one, because the band buttons wrap to two
+        // rows here (the 11 band buttons do not fit one row at this width without truncating them).
+        Rectangle {
+            height: 54px;
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                MenuBar { compact: true; }
+                BandButtons { compact: true; }
+                ModeButtons { compact: true; }
+                FilterWidth { compact: true; }
+                AgcControl { compact: true; }
+                NrNbControl { compact: true; }
+            }
+        }
+
+        // The main area fills whatever height is left between the top and bottom bars.
+        HorizontalLayout {
+            spacing: 4px;
+            vertical-stretch: 1;
+
+            VerticalLayout {
+                spacing: 4px;
+                horizontal-stretch: 2;
+                // Waterfall taller than spectrum (about 40/60), as at 1920x1080.
+                FpgaWindow { label: "spectrum"; vertical-stretch: 2; }
+                FpgaWindow { label: "waterfall"; vertical-stretch: 3; }
+            }
+
+            VerticalLayout {
+                spacing: 4px;
+                horizontal-stretch: 1;
+                min-width: 260px;
+                FrequencyDisplay { compact: true; height: 82px; }
+                SMeter { compact: true; height: 34px; }
+                HorizontalLayout {
+                    spacing: 4px;
+                    height: 62px;
+                    N2adrIndicator { compact: true; horizontal-stretch: 1; }
+                    TxControls { compact: true; horizontal-stretch: 1; }
+                }
+                DigitalPanel { compact: true; vertical-stretch: 1; }
+            }
+        }
+
+        // Bottom bar: RX slices, fewer visible at once than on the large panel.
+        RxSliceList { compact: true; height: 54px; }
+    }
+}

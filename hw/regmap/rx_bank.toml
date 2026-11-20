@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# DRAFT (see [block].status below): base address and page size are fixed
+# (docs/ARCHITECTURE.md 4.1), but the register layout below is a best reading of
+# section 3.2, not yet checked against `rtl/rx/rx_bank.v`. Whoever owns that
+# RTL should edit this file (and flip status to "final") once the bank's own register port
+# is wired up; until then, treat every offset and field here as a proposal. See docs/REGMAP.md
+# for the TOML format and docs/ARCHITECTURE.md 3.2 for the receiver chain this controls.
+#
+# One phase_inc/ctrl pair per receiver, matching the "address bit 0 selects phase_inc vs ctrl"
+# wording in ARCHITECTURE 3.2: at the byte-addressed AHB level that is bit 2, i.e. a pair at
+# every 8 bytes (phase_inc at +0, ctrl at +4). N = 4 to 8 receivers; the array is sized to the
+# maximum (8) so firmware can address any receiver without a rebuild, with unused instances
+# masked off elsewhere.
+
+[block]
+name = "rx_bank"
+base = 0xE803_0000
+size = 0x0001_0000
+status = "draft"
+description = """
+Receiver bank (docs/ARCHITECTURE.md 3.2): per-receiver NCO phase increment and control for the
+CORDIC/CIC/FIR chain in rtl/rx/rx_bank.v (branch rx-dsp). N = 4 to 8 receivers, one register
+port, one shared IQ output stream (not in this register block; see the IQ writer at
+0xE804_0000).
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x5258_0001
+description = "Block identifier/version: 'RX' + version 1 (set by the chip top level)."
+
+[[register]]
+name = "phase_inc"
+offset = 0x004
+count = 8
+stride = 0x008
+description = "Per-receiver NCO phase increment: round(f_Hz / 76.8e6 * 2^32), signed two's complement, relative to the HL2 ADC clock (0.018 Hz steps)."
+
+[[register.field]]
+name = "value"
+bits = "31:0"
+access = "RW"
+reset = 0
+description = "Signed 32-bit phase increment."
+
+[[register]]
+name = "ctrl"
+offset = 0x008
+count = 8
+stride = 0x008
+description = "Per-receiver enable and output rate."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = receiver running and contributing to the shared IQ output stream."
+
+[[register.field]]
+name = "rate_sel"
+bits = "2:1"
+access = "RW"
+reset = 0
+description = "Output sample rate: 0 = 48 kHz, 1 = 96 kHz, 2 = 192 kHz, 3 = 384 kHz (of HL2 time)."

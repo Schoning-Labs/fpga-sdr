@@ -1,0 +1,103 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# FINAL (see [block].status below): rtl/spectrum/spectrum_pipeline.v is built against this
+# layout. Covers only the full-band spectrum (3.3); the zoom DDC/FFT (3.4) is
+# a separate block at 0xE806_0000, not drafted here.
+
+[block]
+name = "spectrum"
+base = 0xE805_0000
+size = 0x0001_0000
+status = "final"
+description = """
+Full-band spectrum (docs/ARCHITECTURE.md 3.3): 16,384-point FFT over the raw 12-bit stream,
+column reduction, averaging, and the waterfall colour mapping. Output lines land in a
+double-buffered line buffer and a waterfall ring in DDR3 (not registers, see 3.5); this block
+is control and status only.
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x0000_0001
+description = "Block identifier/version; rtl/spectrum/spectrum_pipeline.v is version 1."
+
+[[register]]
+name = "ctrl"
+offset = 0x004
+description = "Enable and per-column reduction mode."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = transforms run and lines are produced."
+
+[[register.field]]
+name = "column_mode"
+bits = "1"
+access = "RW"
+reset = 0
+description = "0 = max per column (keeps narrow carriers visible), 1 = mean per column (noise floor), ARCHITECTURE 3.3."
+
+[[register.field]]
+name = "peak_hold"
+bits = "2"
+access = "RW"
+reset = 0
+description = "1 = averaging BSRAM holds the peak over K transforms instead of the mean."
+
+[[register]]
+name = "averaging_k"
+offset = 0x008
+access = "RW"
+reset = 156
+description = "Transforms averaged per output line. ARCHITECTURE 3.3 example: K = 156 for 30 lines/s at the full 4,687.5 transforms/s rate."
+
+[[register]]
+name = "level"
+offset = 0x00C
+description = "Firmware-set offset and gain applied before the 8-bit waterfall colour index (ARCHITECTURE 3.3)."
+
+[[register.field]]
+name = "offset_db64"
+bits = "15:0"
+access = "RW"
+reset = 0
+description = "Signed dB offset, 1/64 dB steps (matches the 16-bit dB line format)."
+
+[[register.field]]
+name = "gain_q8"
+bits = "31:16"
+access = "RW"
+reset = 0x0100
+description = "Unsigned gain, Q8.8 fixed point (0x0100 = 1.0)."
+
+[[register]]
+name = "line_count"
+offset = 0x010
+access = "RO"
+reset = 0
+description = "Free-running count of spectrum lines produced, for firmware pacing against the waterfall writer."
+
+[[register]]
+name = "line_status"
+offset = 0x014
+description = "Which of the two spectrum line buffers is ready to read (double-buffered, ARCHITECTURE 3.3)."
+
+[[register.field]]
+name = "ready_buffer"
+bits = "0"
+access = "RO"
+reset = 0
+description = "Index (0 or 1) of the buffer firmware/compositor should read; the other is being written."
+
+[[register.field]]
+name = "line_done"
+bits = "1"
+access = "W1C"
+reset = 0
+description = "Set on every completed line; drives fabric interrupt line 5 (ARCHITECTURE 4.3, firmware-side use only)."

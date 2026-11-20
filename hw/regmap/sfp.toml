@@ -1,0 +1,418 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# SFP page (docs/ARCHITECTURE.md 4.1 page 0xE80A_0000), (rtl/sfp/sfp_top.v).
+
+[block]
+name = "sfp"
+base = 0xE80A_0000
+size = 0x0001_0000
+status = "draft"
+description = """
+The transceiver of the two SFP+ cages (docs/SFP_LINKS.md): reset and status of both lanes, the cage
+pins, the I2C pins of the board and its multiplexer select as plain bits (firmware runs the I2C
+protocol: clock chip, module memories), and the network socket on SFP0: PCS and MAC settings,
+status, counters and the packet memory. rtl/sfp/sfp_top.v. All in clk_dsp; the page works with
+the lane clocks stopped.
+"""
+
+[[register]]
+name = "id"
+offset = 0x0000
+access = "RO"
+reset = 0x53460001
+description = "Block identifier: SF + version 1."
+
+[[register]]
+name = "serdes_ctrl"
+offset = 0x0004
+description = "Transceiver resets and line fixes. Start-up order: docs/SFP_LINKS.md 2.3."
+
+[[register.field]]
+name = "por_n"
+bits = "0"
+access = "RW"
+reset = 0
+description = "0 = the whole transceiver held in reset (its por_n_i input; only in a build with SFP_POR_FABRIC=1, else no effect). Set to 1 only after the 125 MHz reference runs."
+
+[[register.field]]
+name = "ln0_rst_n"
+bits = "1"
+access = "RW"
+reset = 0
+description = "0 = lane 0 (SFP0, network) held in reset, its lane PLL included (pma_rstn_i). Release it to let the PLL lock."
+
+[[register.field]]
+name = "ln1_rst_n"
+bits = "2"
+access = "RW"
+reset = 0
+description = "0 = lane 1 (SFP1, board link) held in reset."
+
+[[register.field]]
+name = "ln0_rx_rst"
+bits = "3"
+access = "RW"
+reset = 0
+description = "1 = receive side of lane 0 in reset (pulse it when the lane does not lock)."
+
+[[register.field]]
+name = "ln1_rx_rst"
+bits = "4"
+access = "RW"
+reset = 0
+description = "1 = receive side of lane 1 in reset."
+
+[[register.field]]
+name = "ln0_tx_rst"
+bits = "5"
+access = "RW"
+reset = 0
+description = "1 = transmit side of lane 0 in reset."
+
+[[register.field]]
+name = "ln1_tx_rst"
+bits = "6"
+access = "RW"
+reset = 0
+description = "1 = transmit side of lane 1 in reset."
+
+[[register.field]]
+name = "ln0_fix"
+bits = "11:8"
+access = "RW"
+reset = 0
+description = "Lane 0 line fixes, in case the board shows them needed: bit 0 transmit bit order reversed within a symbol, 1 receive reversed, 2 transmit inverted, 3 receive inverted."
+
+[[register.field]]
+name = "ln1_fix"
+bits = "15:12"
+access = "RW"
+reset = 0
+description = "Lane 1 line fixes, same bits."
+
+[[register]]
+name = "serdes_status"
+offset = 0x0008
+description = "Transceiver status, both lanes."
+
+[[register.field]]
+name = "ln0_pll_lock"
+bits = "0"
+access = "RO"
+reset = 0
+description = "Lane 0 transmit PLL locked to the reference."
+
+[[register.field]]
+name = "ln0_cdr_lock"
+bits = "1"
+access = "RO"
+reset = 0
+description = "Lane 0 receive clock recovered."
+
+[[register.field]]
+name = "ln0_signal"
+bits = "2"
+access = "RO"
+reset = 0
+description = "Lane 0 signal detected at the receiver."
+
+[[register.field]]
+name = "ln0_ready"
+bits = "3"
+access = "RO"
+reset = 0
+description = "Lane 0 ready."
+
+[[register.field]]
+name = "ln0_aligned"
+bits = "4"
+access = "RO"
+reset = 0
+description = "Lane 0: our comma aligner is locked."
+
+[[register.field]]
+name = "ln1_pll_lock"
+bits = "8"
+access = "RO"
+reset = 0
+description = "Lane 1 transmit PLL locked."
+
+[[register.field]]
+name = "ln1_cdr_lock"
+bits = "9"
+access = "RO"
+reset = 0
+description = "Lane 1 receive clock recovered."
+
+[[register.field]]
+name = "ln1_signal"
+bits = "10"
+access = "RO"
+reset = 0
+description = "Lane 1 signal detected."
+
+[[register.field]]
+name = "ln1_ready"
+bits = "11"
+access = "RO"
+reset = 0
+description = "Lane 1 ready."
+
+[[register.field]]
+name = "ln1_aligned"
+bits = "12"
+access = "RO"
+reset = 0
+description = "Lane 1: our comma aligner is locked."
+
+[[register.field]]
+name = "q_cmu0_ok"
+bits = "16"
+access = "RO"
+reset = 0
+description = "Quad 1 CMU0 OK (the quad's own status, docs/SFP_LINKS.md 2.3)."
+
+[[register.field]]
+name = "q_cmu1_ok"
+bits = "17"
+access = "RO"
+reset = 0
+description = "Quad 1 CMU1 OK."
+
+[[register.field]]
+name = "q_refclk_det0"
+bits = "18"
+access = "RO"
+reset = 0
+description = "Quad 1 reference detect, CM0."
+
+[[register.field]]
+name = "q_refclk_det1"
+bits = "19"
+access = "RO"
+reset = 0
+description = "Quad 1 reference detect, CM1."
+
+[[register.field]]
+name = "ln0_cmu_ok"
+bits = "20"
+access = "RO"
+reset = 0
+description = "Lane 0 CMU OK."
+
+[[register.field]]
+name = "ln1_cmu_ok"
+bits = "21"
+access = "RO"
+reset = 0
+description = "Lane 1 CMU OK."
+
+[[register.field]]
+name = "ln0_pma_rx_lock"
+bits = "22"
+access = "RO"
+reset = 0
+description = "Lane 0 PMA receive lock."
+
+[[register.field]]
+name = "ln1_pma_rx_lock"
+bits = "23"
+access = "RO"
+reset = 0
+description = "Lane 1 PMA receive lock."
+
+[[register.field]]
+name = "ln0_tx_gap"
+bits = "24"
+access = "RO"
+reset = 0
+description = "Lane 0: a transmit word was not written (buffer almost full) since its transmit reset was released. Sticky."
+
+[[register.field]]
+name = "ln0_rx_gap"
+bits = "25"
+access = "RO"
+reset = 0
+description = "Lane 0: a receive clock without a word (buffer almost empty) since its receive reset was released. Sticky."
+
+[[register.field]]
+name = "ln1_tx_gap"
+bits = "26"
+access = "RO"
+reset = 0
+description = "Lane 1: a transmit word was not written since its transmit reset was released. Sticky."
+
+[[register.field]]
+name = "ln1_rx_gap"
+bits = "27"
+access = "RO"
+reset = 0
+description = "Lane 1: a receive clock without a word since its receive reset was released. Sticky."
+
+[[register]]
+name = "cage"
+offset = 0x000C
+description = "Cage pins."
+
+[[register.field]]
+name = "sfp0_tx_disable"
+bits = "0"
+access = "RW"
+reset = 1
+description = "1 = SFP0 module transmitter off (pin R18)."
+
+[[register.field]]
+name = "sfp1_tx_disable"
+bits = "1"
+access = "RW"
+reset = 1
+description = "1 = SFP1 module transmitter off (pin M20)."
+
+[[register.field]]
+name = "sfp0_los"
+bits = "8"
+access = "RO"
+reset = 0
+description = "SFP0 loss-of-signal pin (V18). Meaningless with a passive cable."
+
+[[register.field]]
+name = "sfp1_los"
+bits = "9"
+access = "RO"
+reset = 0
+description = "SFP1 loss-of-signal pin (W18)."
+
+[[register]]
+name = "twi"
+offset = 0x0010
+description = "The system I2C bus of the board, bit by bit, and its 8-way multiplexer."
+
+[[register.field]]
+name = "scl"
+bits = "0"
+access = "RW"
+reset = 1
+description = "0 = pull SCL (K25) low, 1 = release it."
+
+[[register.field]]
+name = "sda"
+bits = "1"
+access = "RW"
+reset = 1
+description = "0 = pull SDA (K26) low, 1 = release it."
+
+[[register.field]]
+name = "sel"
+bits = "4:2"
+access = "RW"
+reset = 0
+description = "Multiplexer select pins: bit 2 N19, bit 1 P19, bit 0 P26. N19 is the multiplexer's LEAST significant select input, so channel c is written as c bit 0 in field bit 2, c bit 2 in field bit 0 (fw/tr-fabric/src/sfp.rs channel::sel_bits). Channels: 0 SFP0 module, 1 SFP1 module, 3 clock chip PLL0 (transceiver reference), 4 clock chip PLL1."
+
+[[register.field]]
+name = "scl_in"
+bits = "8"
+access = "RO"
+reset = 0
+description = "Level on SCL."
+
+[[register.field]]
+name = "sda_in"
+bits = "9"
+access = "RO"
+reset = 0
+description = "Level on SDA."
+
+[[register]]
+name = "net_ctrl"
+offset = 0x0020
+description = "Network socket (SFP0) settings."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "0 = PCS and MAC held in reset; counters and ring pointers cleared (write rx_rd_ptr 0 too)."
+
+[[register.field]]
+name = "sgmii"
+bits = "1"
+access = "RW"
+reset = 0
+description = "0 = 1000BASE-X, 1 = SGMII (a 1000BASE-T copper module in SGMII mode)."
+
+[[register.field]]
+name = "autoneg"
+bits = "2"
+access = "RW"
+reset = 1
+description = "1 = auto-negotiation (clause 37, or the SGMII exchange). 0 = none: idle at once, link up when idles arrive."
+
+[[register.field]]
+name = "restart"
+bits = "3"
+access = "RW"
+reset = 0
+description = "Write 1: restart the negotiation. Reads 0."
+
+[[register]]
+name = "net_status"
+offset = 0x0024
+description = "Network socket status."
+
+[[register.field]]
+name = "link_up"
+bits = "0"
+access = "RO"
+reset = 0
+description = "Link up: frames can be sent and are received."
+
+[[register.field]]
+name = "an_done"
+bits = "1"
+access = "RO"
+reset = 0
+description = "Negotiation complete."
+
+[[register.field]]
+name = "rx_sync"
+bits = "2"
+access = "RO"
+reset = 0
+description = "Receiver aligned."
+
+[[register.field]]
+name = "rx_idle"
+bits = "3"
+access = "RO"
+reset = 0
+description = "Idle is being received (three in a row)."
+
+[[register.field]]
+name = "tx_busy"
+bits = "4"
+access = "RO"
+reset = 0
+description = "A frame written with tx_len has not gone out yet."
+
+[[register.field]]
+name = "partner"
+bits = "31:16"
+access = "RO"
+reset = 0
+description = "The configuration word of the link partner. SGMII: bit 15 link, 12 full duplex, 11:10 speed (2 = 1000 Mbit/s)."
+
+[[register]]
+name = "align_losses"
+offset = 0x0040
+access = "RO"
+reset = 0x0
+description = "Times the aligner of lane 0 lost its lock (10 bits)."
+
+[[register]]
+name = "code_errors"
+offset = 0x0044
+access = "RO"
+reset = 0x0
+description = "Symbols of lane 0 that are not in the 8b/10b alphabet while its aligner is locked (16 bits, stops at 0xFFFF). Since 2026-10-21."

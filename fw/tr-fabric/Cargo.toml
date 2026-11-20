@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "tr-fabric"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Drivers for the register blocks of the fabric, built on tr-regs"
+
+[dependencies]
+tr-regs = { path = "../tr-regs" }
+# The eth and hl2link modules implement the MacRings trait of tr-net on the registers of the network unit and the HL2 link.
+# default-features = false: the no_std core only (this crate is no_std/target-only, see fw/Cargo.toml).
+tr-net = { path = "../tr-net", default-features = false }
+tr-usbh = { path = "../tr-usbh" }
+
+[features]
+# Host tests only (this crate's and other crates'): `mock::MockFabric`, a register space and a DDR3
+# memory in one, with a log of every access in order. Never built into firmware.
+mock = []
+
+[dev-dependencies]
+tr-regs = { path = "../tr-regs", features = ["mock"] }
+tr-fabric = { path = ".", features = ["mock"] }

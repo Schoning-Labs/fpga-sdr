@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "tr-sim"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "PC program: real HL2 or a capture through the receiver model, tr-dsp, tr-modes, tr-gui"
+
+[dependencies]

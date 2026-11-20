@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: LGPL-2.1-only
+# Rust port 2026 by Franz Schöning of parts of Codec 2 (Copyright David Rowe and contributors).
+# See NOTICE in this directory.
+
+[package]
+name = "tr-codec2"
+version = "0.1.0"
+edition = "2021"
+license = "LGPL-2.1-only"
+description = "Codec 2 700C speech decoder (and encoder), a no_std Rust port of David Rowe's codec2"
+
+[dependencies]
+libm = { version = "0.2.16", default-features = false }
+
+[dev-dependencies]
+hound = "3.5.1"

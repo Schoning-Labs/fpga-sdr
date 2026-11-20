@@ -1,0 +1,36 @@
+{
+ "cell": {
+  "ALU:CIN>COUT": 0.045,
+  "ALU:CIN>SUM": 0.25,
+  "ALU:I>COUT": 0.5,
+  "LUT": 0.392,
+  "MUXW:I": 0.135
+ },
+ "designs": [
+  "sdr_top.tr"
+ ],
+ "net": {
+  "terms": [
+   "fanout 1",
+   "fanout>1",
+   "log2 fanout",
+   "log2 module (fanout>1)",
+   "log2 load modules",
+   "log2 design (fanout>1)"
+  ],
+  "w": [
+   0.0122,
+   -1.4936,
+   0.1955,
+   0.1745,
+   0.3109,
+   -0.8636
+  ]
+ },
+ "tco": 0.273,
+ "tsu": {
+  "CE": 0.224,
+  "RESET": 0.268,
+  "other": 0.242
+ }
+}

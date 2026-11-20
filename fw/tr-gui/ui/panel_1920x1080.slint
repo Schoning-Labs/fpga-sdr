@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Front panel at 1920x1080 (docs/DECISIONS.md: the owner's 4K monitor scales it). Built from the
+// same `ui/components/*.slint` files as `panel_1024x600.slint`, arranged for the larger screen:
+// a top bar of controls, spectrum over waterfall (two FPGA windows, drawn by the video block
+// where this file leaves the key color) beside a wide sidebar, and the RX slice list at the
+// bottom. State comes from `PanelModel` (model.slint).
+
+import { Theme } from "components/theme.slint";
+import { FpgaWindow } from "components/fpga_window.slint";
+// Re-exported so the Rust code generated for this root file exposes `PanelModel` and the
+// struct types it uses (`impl_apply_state!` in src/lib.rs). Without this they are compiled in,
+// because every component below binds to them, but they are not part of this file's public
+// Rust API.
+export { PanelModel, RxSliceInfo, Ft8DecodeInfo } from "model.slint";
+import { FrequencyDisplay } from "components/frequency_display.slint";
+import { BandButtons } from "components/band_buttons.slint";
+import { ModeButtons } from "components/mode_buttons.slint";
+import { AgcControl } from "components/agc_control.slint";
+import { FilterWidth } from "components/filter_width.slint";
+import { NrNbControl } from "components/nr_nb_control.slint";
+import { RxSliceList } from "components/rx_slice_list.slint";
+import { TxControls } from "components/tx_controls.slint";
+import { N2adrIndicator } from "components/n2adr_indicator.slint";
+import { SMeter } from "components/s_meter.slint";
+import { DigitalPanel } from "components/digital_panel.slint";
+import { MenuBar } from "components/menu_bar.slint";
+
+export component MainWindow1920x1080 inherits Window {
+    width: 1920px;
+    height: 1080px;
+    background: Theme.panel-background;
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 8px;
+
+        // Top bar: menu, band, mode, filter, AGC, NR/NB.
+        Rectangle {
+            height: 72px;
+            HorizontalLayout {
+                spacing: 16px;
+                alignment: start;
+                MenuBar { compact: false; }
+                BandButtons { compact: false; }
+                ModeButtons { compact: false; }
+                FilterWidth { compact: false; }
+                AgcControl { compact: false; }
+                NrNbControl { compact: false; }
+            }
+        }
+
+        // Main area: spectrum and waterfall (FPGA) beside the sidebar (Slint). `vertical-stretch: 1`
+        // is set all the way down (this row, both columns, and the one flexible item in each
+        // column) so the panel uses the full window height and leaves no empty strip below the
+        // RX slice list.
+        HorizontalLayout {
+            spacing: 8px;
+            vertical-stretch: 1;
+
+            VerticalLayout {
+                spacing: 8px;
+                width: 1450px;
+                vertical-stretch: 1;
+                // Waterfall taller than spectrum (about 40/60), because the scrolling history
+                // usually needs more room than the instantaneous trace.
+                FpgaWindow { label: "spectrum"; vertical-stretch: 2; }
+                FpgaWindow { label: "waterfall"; vertical-stretch: 3; }
+            }
+
+            VerticalLayout {
+                spacing: 8px;
+                width: 420px;
+                vertical-stretch: 1;
+                FrequencyDisplay { compact: false; height: 136px; }
+                SMeter { compact: false; height: 58px; }
+                N2adrIndicator { compact: false; height: 90px; }
+                TxControls { compact: false; height: 96px; }
+                DigitalPanel { compact: false; vertical-stretch: 1; }
+            }
+        }
+
+        // Bottom bar: up to 8 RX slices.
+        RxSliceList { compact: false; height: 90px; }
+    }
+}

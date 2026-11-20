@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// Pins of the minimal HL2 test build rtl/hl2min/hl2min_top.v (docs/HL2MIN.md). Locations as in
+// gowin/p1/sdr.cst (clock, key, UART, SFP cage pins, I2C) and the earlier design's constraints (LED[0..3],
+// board-tested there). No port on RECONFIG_N (AE16, the board's reserved reconfiguration pin). The serial pairs
+// of quad 1 and its reference input are bound by the transceiver block, not here.
+
+IO_LOC "clk_50m" P16;
+IO_PORT "clk_50m" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "key_rst_n" G16;
+IO_PORT "key_rst_n" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+IO_LOC "uart_txd" P15;
+IO_PORT "uart_txd" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "led[0]" J14;
+IO_PORT "led[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "led[1]" R26;
+IO_PORT "led[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "led[2]" L20;
+IO_PORT "led[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "led[3]" M25;
+IO_PORT "led[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "sfp_tx_disable[0]" R18;
+IO_PORT "sfp_tx_disable[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "sfp_tx_disable[1]" M20;
+IO_PORT "sfp_tx_disable[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "twi_scl" K25;
+IO_PORT "twi_scl" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "twi_sda" K26;
+IO_PORT "twi_sda" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+// I2C multiplexer select: N19 is select bit 0 (docs/SFP_LINKS.md section 7)
+IO_LOC "twi_sel[2]" N19;
+IO_PORT "twi_sel[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "twi_sel[1]" P19;
+IO_PORT "twi_sel[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "twi_sel[0]" P26;
+IO_PORT "twi_sel[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+
+// the two lane clocks on long-wire clock lines, as in gowin/p1/sdr.cst (lane clocks on ordinary
+// wiring failed hold in a full build)
+CLOCK_LOC "sfp_txc" BUFG[12] = CLK;
+CLOCK_LOC "n1_rxc" BUFG[13] = CLK;

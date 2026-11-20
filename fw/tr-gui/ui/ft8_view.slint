@@ -1,0 +1,244 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// FT8 operating view at 1920x1080 (docs/P2_FT8_FW.md), the view inside `Ft8Screen1920x1080`
+// (host test) and `AppScreen1920x1080` (firmware). It shows the band and dial frequency, the UTC
+// clock and its state, the waterfall window the logic draws (key color) with an audio frequency
+// scale, the decode list (click a line to answer it), CQ, halt, TX slot, and the TX enable switch.
+//
+// The geometry is fixed on purpose: the firmware places the logic's waterfall window on the
+// key color rectangle (`tr_gui::ft8::WATERFALL_RECT`), and the host test clicks controls by
+// position.
+
+import { Theme } from "components/theme.slint";
+import { Ft8Model } from "ft8_model.slint";
+
+component Ft8Button inherits Rectangle {
+    in property <string> label;
+    in property <brush> fill: Theme.button-idle;
+    in property <brush> ink: Theme.text-primary;
+    in property <length> text-size: 20px;
+    callback clicked();
+    background: fill;
+    border-width: 1px;
+    border-color: Theme.panel-frame-active;
+    border-radius: 4px;
+    Text {
+        text: label;
+        color: ink;
+        font-size: text-size;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+component BandButton inherits Rectangle {
+    in property <int> index;
+    property <bool> on: index == Ft8Model.band-index;
+    width: 62px;
+    height: 44px;
+    background: on ? Theme.button-active : Theme.button-idle;
+    border-width: 1px;
+    border-color: on ? Theme.accent : Theme.panel-frame-active;
+    border-radius: 4px;
+    Text {
+        text: Ft8Model.band-names[index];
+        color: on ? Theme.text-primary : Theme.text-dim;
+        font-size: 18px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    TouchArea {
+        clicked => { Ft8Model.request-band-select(index); }
+    }
+}
+
+component DecodeRow inherits Rectangle {
+    in property <int> index;
+    in property <string> utc-text;
+    in property <string> snr-text;
+    in property <string> dt-text;
+    in property <string> freq-text;
+    in property <string> message-text;
+    in property <int> kind;
+    height: 30px;
+    background: touch.has-hover ? Theme.panel-frame-active : (kind == 2 ? #4a1f24 : kind == 3 ? #4a4420 : transparent);
+    property <color> ink: kind == 1 ? Theme.accent-good : kind == 2 ? #ff8a94 : kind == 3 ? Theme.accent-warn : Theme.text-primary;
+    Text { x: 8px; width: 90px; height: parent.height; text: utc-text; color: Theme.text-dim; font-size: 17px; vertical-alignment: center; }
+    Text { x: 100px; width: 50px; height: parent.height; text: snr-text; color: Theme.accent; font-size: 17px; vertical-alignment: center; horizontal-alignment: right; }
+    Text { x: 160px; width: 50px; height: parent.height; text: dt-text; color: Theme.text-dim; font-size: 17px; vertical-alignment: center; horizontal-alignment: right; }
+    Text { x: 220px; width: 60px; height: parent.height; text: freq-text; color: Theme.text-dim; font-size: 17px; vertical-alignment: center; horizontal-alignment: right; }
+    Text { x: 300px; width: parent.width - 308px; height: parent.height; text: message-text; color: ink; font-size: 19px; font-weight: 600; vertical-alignment: center; overflow: elide; }
+    touch := TouchArea {
+        clicked => { Ft8Model.request-decode-click(index); }
+    }
+}
+
+export component Ft8View inherits Rectangle {
+    width: 1920px;
+    height: 1080px;
+    background: Theme.panel-background;
+
+    // ---------------------------------------------------------------- top bar, y 8..80
+    Text { x: 16px; y: 14px; text: "FT8"; color: Theme.accent; font-size: 44px; font-weight: 700; }
+    Text { x: 120px; y: 16px; text: Ft8Model.my-call; color: Theme.text-dim; font-size: 20px; }
+
+    // Switch to the FreeDV screen (docs/FREEDV.md) or the LISTEN screen (docs/LISTEN.md).
+    Ft8Button {
+        x: 120px; y: 44px; width: 66px; height: 30px;
+        label: "FreeDV";
+        text-size: 16px;
+        clicked => { Ft8Model.request-switch-to-freedv(); }
+    }
+    Ft8Button {
+        x: 190px; y: 44px; width: 66px; height: 30px;
+        label: "LISTEN";
+        text-size: 16px;
+        clicked => { Ft8Model.request-switch-to-listen(); }
+    }
+
+    for name[i] in Ft8Model.band-names: BandButton {
+        x: 260px + i * 68px;
+        y: 22px;
+        index: i;
+    }
+
+    Text { x: 960px; y: 10px; width: 400px; text: Ft8Model.dial-text; color: Theme.text-primary; font-size: 52px; font-weight: 700; horizontal-alignment: right; }
+    Text { x: 1368px; y: 40px; text: "Hz"; color: Theme.text-dim; font-size: 18px; }
+
+    // UTC clock and its state
+    Text { x: 1430px; y: 10px; width: 220px; text: Ft8Model.utc-text; color: Ft8Model.clock-level == 2 ? Theme.text-primary : Theme.text-dim; font-size: 44px; font-weight: 600; horizontal-alignment: right; }
+    Rectangle {
+        x: 1670px; y: 20px; width: 234px; height: 44px;
+        border-radius: 4px;
+        background: Ft8Model.clock-level == 2 ? Theme.accent-good : Ft8Model.clock-level == 1 ? Theme.accent-warn : Theme.accent-bad;
+        Text { text: Ft8Model.clock-text; color: #0a0a0a; font-size: 17px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+    }
+
+    // Slot progress, y 84..92
+    Rectangle {
+        x: 16px; y: 84px; width: 1888px; height: 8px;
+        background: Theme.panel-frame;
+        Rectangle {
+            x: 0px; width: parent.width * Ft8Model.slot-progress; height: parent.height;
+            background: Ft8Model.transmitting ? Theme.accent-bad : Ft8Model.slot-is-ours ? Theme.accent-warn : Theme.accent;
+        }
+    }
+
+    // ---------------------------------------------------------------- waterfall, left
+    // Frame 16..1196 x 104..784; the key-color area inside is WATERFALL_RECT (20, 124, 1172, 656).
+    Rectangle {
+        x: 16px; y: 104px; width: 1180px; height: 680px;
+        background: Theme.panel-frame;
+        border-width: 1px;
+        border-color: Theme.panel-frame-active;
+        Text { x: 6px; y: 1px; text: "waterfall (drawn by the FPGA)"; color: Theme.text-dim; font-size: 13px; }
+    }
+    Rectangle { x: 20px; y: 124px; width: 1172px; height: 656px; background: Theme.key-colour; }
+
+    // Audio frequency scale 0..3000 Hz under the waterfall, y 788..836. Click = TX frequency.
+    Rectangle {
+        x: 20px; y: 788px; width: 1172px; height: 48px;
+        background: Theme.button-idle;
+        for k in [0, 1, 2, 3, 4, 5, 6]: Rectangle {
+            x: parent.width * k / 6 - (k == 6 ? 1px : 0px); width: 1px; height: 14px; background: Theme.text-dim;
+        }
+        for k in [0, 1, 2, 3, 4, 5]: Text {
+            x: parent.width * k / 6 + 5px; y: 16px;
+            text: "\{k * 500}";
+            color: Theme.text-dim; font-size: 15px;
+        }
+        // RX marker (green), TX marker (red): 50 Hz wide, the width of an FT8 signal
+        Rectangle { x: parent.width * Ft8Model.rx-audio-hz / 3000; width: parent.width * 50 / 3000; height: 10px; background: Theme.accent-good; }
+        Rectangle { x: parent.width * Ft8Model.tx-audio-hz / 3000; y: 10px; width: parent.width * 50 / 3000; height: 10px; background: Theme.accent-bad; }
+        scale := TouchArea {
+            clicked => { Ft8Model.request-tx-freq(Math.round(3000 * self.mouse-x / self.width)); }
+        }
+    }
+
+    // ---------------------------------------------------------------- operating controls, y 848..1064
+    Rectangle {
+        x: 16px; y: 848px; width: 1180px; height: 216px;
+        background: Theme.panel-frame;
+        border-width: 1px;
+        border-color: Ft8Model.transmitting ? Theme.accent-bad : Theme.panel-frame-active;
+    }
+    // TX enable: off unless the operator switches it on.
+    Ft8Button {
+        x: 32px; y: 864px; width: 300px; height: 84px;
+        label: Ft8Model.tx-enabled ? "TX ENABLED" : "TX OFF";
+        fill: Ft8Model.tx-enabled ? Theme.accent-bad : Theme.button-idle;
+        ink: Ft8Model.tx-enabled ? #0a0a0a : Theme.text-dim;
+        text-size: 30px;
+        clicked => { Ft8Model.request-tx-enable-toggle(); }
+    }
+    Ft8Button {
+        x: 32px; y: 964px; width: 142px; height: 84px;
+        label: "CQ";
+        text-size: 30px;
+        clicked => { Ft8Model.request-cq(); }
+    }
+    Ft8Button {
+        x: 190px; y: 964px; width: 142px; height: 84px;
+        label: "HALT";
+        text-size: 26px;
+        clicked => { Ft8Model.request-halt(); }
+    }
+    Ft8Button {
+        x: 352px; y: 864px; width: 250px; height: 84px;
+        label: Ft8Model.tx-first ? "TX slot: 00 / 30" : "TX slot: 15 / 45";
+        text-size: 22px;
+        clicked => { Ft8Model.request-tx-parity-toggle(); }
+    }
+    Text { x: 352px; y: 968px; text: "TX " + Ft8Model.tx-audio-hz + " Hz"; color: Theme.accent-bad; font-size: 24px; }
+    Text { x: 352px; y: 1008px; text: "RX " + Ft8Model.rx-audio-hz + " Hz"; color: Theme.accent-good; font-size: 24px; }
+
+    Text { x: 624px; y: 862px; text: Ft8Model.transmitting ? "transmitting" : "next transmission"; color: Theme.text-dim; font-size: 15px; }
+    Rectangle {
+        x: 624px; y: 884px; width: 556px; height: 64px;
+        background: Ft8Model.transmitting ? Theme.accent-bad : Theme.button-idle;
+        border-radius: 4px;
+        Text {
+            x: 12px; width: parent.width - 24px; height: parent.height;
+            text: Ft8Model.tx-message == "" ? "-" : Ft8Model.tx-message;
+            color: Ft8Model.transmitting ? #0a0a0a : Theme.text-primary;
+            font-size: 30px; font-weight: 700; vertical-alignment: center; overflow: elide;
+        }
+    }
+    Text { x: 624px; y: 962px; width: 556px; text: Ft8Model.qso-text; color: Theme.text-primary; font-size: 22px; overflow: elide; }
+    Text { x: 624px; y: 1010px; width: 556px; text: Ft8Model.link-text; color: Ft8Model.link-ok ? Theme.accent-good : Theme.accent-warn; font-size: 18px; overflow: elide; }
+
+    // ---------------------------------------------------------------- decode list, right
+    Rectangle {
+        x: 1212px; y: 104px; width: 692px; height: 960px;
+        background: Theme.panel-frame;
+        border-width: 1px;
+        border-color: Theme.panel-frame-active;
+    }
+    Text { x: 1220px; y: 110px; width: 90px; text: "UTC"; color: Theme.text-dim; font-size: 14px; }
+    Text { x: 1312px; y: 110px; width: 50px; text: "dB"; color: Theme.text-dim; font-size: 14px; horizontal-alignment: right; }
+    Text { x: 1372px; y: 110px; width: 50px; text: "DT"; color: Theme.text-dim; font-size: 14px; horizontal-alignment: right; }
+    Text { x: 1432px; y: 110px; width: 60px; text: "Hz"; color: Theme.text-dim; font-size: 14px; horizontal-alignment: right; }
+    Text { x: 1512px; y: 110px; text: "Message  (click a line to answer)"; color: Theme.text-dim; font-size: 14px; }
+    Rectangle { x: 1212px; y: 132px; width: 692px; height: 1px; background: Theme.panel-frame-active; }
+    // Rows from y 136, 30 px each: row i covers y 136 + 30 i .. 166 + 30 i (`DECODE_ROWS` in Rust).
+    Flickable {
+        x: 1212px; y: 136px; width: 692px; height: 924px;
+        content-height: Ft8Model.decodes.length * 30px;
+        for d[i] in Ft8Model.decodes: DecodeRow {
+            y: i * 30px;
+            width: 692px;
+            index: i;
+            utc-text: d.utc-text;
+            snr-text: d.snr-text;
+            dt-text: d.dt-text;
+            freq-text: d.freq-text;
+            message-text: d.message-text;
+            kind: d.kind;
+        }
+    }
+}

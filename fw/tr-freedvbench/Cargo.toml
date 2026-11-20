@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# FreeDV receive under QEMU with instruction counting (tools/qemu_freedv.sh,
+# docs/FREEDV.md section 6). Target-only, like tr-bench and tr-ft8bench.
+
+[package]
+name = "tr-freedvbench"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "FreeDV 700D/700E receive under QEMU with instruction counting"
+
+[dependencies]
+tr-freedv = { path = "../tr-freedv" }
+tr-ae350 = { path = "../tr-ae350", default-features = false }
+riscv = "0.16"
+riscv-rt = { version = "0.18", features = ["single-hart"] }
+
+[features]
+default = ["board-ae350"]
+board-ae350 = ["tr-ae350/board-ae350"]
+board-qemu = ["tr-ae350/board-qemu"]
+
+[[bin]]
+name = "freedv_bench"
+path = "src/main.rs"
+required-features = ["board-qemu"]

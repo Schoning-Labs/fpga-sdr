@@ -1,0 +1,255 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+
+// GENERATED FILE -- do not edit by hand. Produced by `cargo run -p xtask -- regmap`
+// from hw/regmap/usbh.toml. See docs/REGMAP.md.
+//
+// USB host on the Pmod board (docs/USB_HOST.md, rtl/usbh/usbh_regs.v): two ports, full and low speed. The
+// logic keeps the frames going and does one transaction at a time for the firmware; the firmware (fw/tr-usbh)
+// does the rest. Registers at 0x100 belong to port 0 (the board's USB1), the same at 0x200 to port 1 (USB2).
+// status: final
+
+`ifndef SDR_REGMAP_USBH_VH
+`define SDR_REGMAP_USBH_VH
+
+`define USBH_BASE 32'hE80F0000
+`define USBH_SIZE 32'h00010000
+
+// id -- Block identifier/version: 'UH' + version 1.
+`define USBH_ID_ADDR 32'h00000000
+`define USBH_ID_ABS_ADDR (`USBH_BASE + `USBH_ID_ADDR)
+`define USBH_ID_RESET 32'h55480001
+
+// ctrl -- Switches for both ports.
+`define USBH_CTRL_ADDR 32'h00000004
+`define USBH_CTRL_ABS_ADDR (`USBH_BASE + `USBH_CTRL_ADDR)
+`define USBH_CTRL_RESET 32'h00000000
+`define USBH_CTRL_SWAP_LSB 0
+`define USBH_CTRL_SWAP_MSB 0
+`define USBH_CTRL_SWAP_WIDTH 1
+`define USBH_CTRL_IRQ_RX_LSB 8
+`define USBH_CTRL_IRQ_RX_MSB 8
+`define USBH_CTRL_IRQ_RX_WIDTH 1
+`define USBH_CTRL_IRQ_DONE_LSB 9
+`define USBH_CTRL_IRQ_DONE_MSB 9
+`define USBH_CTRL_IRQ_DONE_WIDTH 1
+`define USBH_CTRL_IRQ_LINE_LSB 10
+`define USBH_CTRL_IRQ_LINE_MSB 10
+`define USBH_CTRL_IRQ_LINE_WIDTH 1
+
+// spk -- Speaker stream (isochronous OUT): the radio's 48 kHz stream, one packet per frame.
+`define USBH_SPK_ADDR 32'h00000010
+`define USBH_SPK_ABS_ADDR (`USBH_BASE + `USBH_SPK_ADDR)
+`define USBH_SPK_RESET 32'h00003000
+`define USBH_SPK_ENABLE_LSB 0
+`define USBH_SPK_ENABLE_MSB 0
+`define USBH_SPK_ENABLE_WIDTH 1
+`define USBH_SPK_PORT_LSB 1
+`define USBH_SPK_PORT_MSB 1
+`define USBH_SPK_PORT_WIDTH 1
+`define USBH_SPK_EP_LSB 2
+`define USBH_SPK_EP_MSB 5
+`define USBH_SPK_EP_WIDTH 4
+`define USBH_SPK_MONO_LSB 6
+`define USBH_SPK_MONO_MSB 6
+`define USBH_SPK_MONO_WIDTH 1
+`define USBH_SPK_BYTES3_LSB 7
+`define USBH_SPK_BYTES3_MSB 7
+`define USBH_SPK_BYTES3_WIDTH 1
+`define USBH_SPK_MAX_SAMPLES_LSB 8
+`define USBH_SPK_MAX_SAMPLES_MSB 13
+`define USBH_SPK_MAX_SAMPLES_WIDTH 6
+
+// mic -- Microphone stream (isochronous IN): one IN per frame, the samples go to the speech FIFO of page usb (usb.ctrl.speech_src).
+`define USBH_MIC_ADDR 32'h00000014
+`define USBH_MIC_ABS_ADDR (`USBH_BASE + `USBH_MIC_ADDR)
+`define USBH_MIC_RESET 32'h00000000
+`define USBH_MIC_ENABLE_LSB 0
+`define USBH_MIC_ENABLE_MSB 0
+`define USBH_MIC_ENABLE_WIDTH 1
+`define USBH_MIC_PORT_LSB 1
+`define USBH_MIC_PORT_MSB 1
+`define USBH_MIC_PORT_WIDTH 1
+`define USBH_MIC_EP_LSB 2
+`define USBH_MIC_EP_MSB 5
+`define USBH_MIC_EP_WIDTH 4
+`define USBH_MIC_MONO_LSB 6
+`define USBH_MIC_MONO_MSB 6
+`define USBH_MIC_MONO_WIDTH 1
+`define USBH_MIC_BYTES3_LSB 7
+`define USBH_MIC_BYTES3_MSB 7
+`define USBH_MIC_BYTES3_WIDTH 1
+
+// audio_status -- Audio counters, wrapping.
+`define USBH_AUDIO_STATUS_ADDR 32'h00000018
+`define USBH_AUDIO_STATUS_ABS_ADDR (`USBH_BASE + `USBH_AUDIO_STATUS_ADDR)
+`define USBH_AUDIO_STATUS_RESET 32'h00000000
+`define USBH_AUDIO_STATUS_SPK_FILL_LSB 0
+`define USBH_AUDIO_STATUS_SPK_FILL_MSB 7
+`define USBH_AUDIO_STATUS_SPK_FILL_WIDTH 8
+`define USBH_AUDIO_STATUS_SPK_OVERRUNS_LSB 8
+`define USBH_AUDIO_STATUS_SPK_OVERRUNS_MSB 15
+`define USBH_AUDIO_STATUS_SPK_OVERRUNS_WIDTH 8
+`define USBH_AUDIO_STATUS_MIC_BAD_PACKETS_LSB 16
+`define USBH_AUDIO_STATUS_MIC_BAD_PACKETS_MSB 31
+`define USBH_AUDIO_STATUS_MIC_BAD_PACKETS_WIDTH 16
+
+// mic_count -- Microphone samples received since reset (wraps): read twice a known time apart for the device's true rate.
+`define USBH_MIC_COUNT_ADDR 32'h0000001C
+`define USBH_MIC_COUNT_ABS_ADDR (`USBH_BASE + `USBH_MIC_COUNT_ADDR)
+`define USBH_MIC_COUNT_RESET 32'h00000000
+
+// port_ctrl -- One port. A write also clears `gone`.
+`define USBH_PORT_CTRL_OFFSET 32'h00000100
+`define USBH_PORT_CTRL_STRIDE 32'h00000100
+`define USBH_PORT_CTRL_COUNT 2
+`define USBH_PORT_CTRL_ADDR(i) (`USBH_PORT_CTRL_OFFSET + (i)*`USBH_PORT_CTRL_STRIDE)
+`define USBH_PORT_CTRL_ABS_ADDR(i) (`USBH_BASE + `USBH_PORT_CTRL_ADDR(i))
+`define USBH_PORT_CTRL_RESET 32'h00000000
+`define USBH_PORT_CTRL_MODE_LSB 0
+`define USBH_PORT_CTRL_MODE_MSB 2
+`define USBH_PORT_CTRL_MODE_WIDTH 3
+`define USBH_PORT_CTRL_LOW_SPEED_LSB 3
+`define USBH_PORT_CTRL_LOW_SPEED_MSB 3
+`define USBH_PORT_CTRL_LOW_SPEED_WIDTH 1
+`define USBH_PORT_CTRL_ADDRESS_LSB 4
+`define USBH_PORT_CTRL_ADDRESS_MSB 10
+`define USBH_PORT_CTRL_ADDRESS_WIDTH 7
+
+// port_status -- State of one port. Reading clears ev_line and ev_done.
+`define USBH_PORT_STATUS_OFFSET 32'h00000104
+`define USBH_PORT_STATUS_STRIDE 32'h00000100
+`define USBH_PORT_STATUS_COUNT 2
+`define USBH_PORT_STATUS_ADDR(i) (`USBH_PORT_STATUS_OFFSET + (i)*`USBH_PORT_STATUS_STRIDE)
+`define USBH_PORT_STATUS_ABS_ADDR(i) (`USBH_BASE + `USBH_PORT_STATUS_ADDR(i))
+`define USBH_PORT_STATUS_RESET 32'h00000000
+`define USBH_PORT_STATUS_DP_LSB 0
+`define USBH_PORT_STATUS_DP_MSB 0
+`define USBH_PORT_STATUS_DP_WIDTH 1
+`define USBH_PORT_STATUS_DN_LSB 1
+`define USBH_PORT_STATUS_DN_MSB 1
+`define USBH_PORT_STATUS_DN_WIDTH 1
+`define USBH_PORT_STATUS_GONE_LSB 2
+`define USBH_PORT_STATUS_GONE_MSB 2
+`define USBH_PORT_STATUS_GONE_WIDTH 1
+`define USBH_PORT_STATUS_BUSY_LSB 3
+`define USBH_PORT_STATUS_BUSY_MSB 3
+`define USBH_PORT_STATUS_BUSY_WIDTH 1
+`define USBH_PORT_STATUS_RESULT_LSB 4
+`define USBH_PORT_STATUS_RESULT_MSB 6
+`define USBH_PORT_STATUS_RESULT_WIDTH 3
+`define USBH_PORT_STATUS_RX_ANY_LSB 7
+`define USBH_PORT_STATUS_RX_ANY_MSB 7
+`define USBH_PORT_STATUS_RX_ANY_WIDTH 1
+`define USBH_PORT_STATUS_EV_LINE_LSB 8
+`define USBH_PORT_STATUS_EV_LINE_MSB 8
+`define USBH_PORT_STATUS_EV_LINE_WIDTH 1
+`define USBH_PORT_STATUS_EV_DONE_LSB 9
+`define USBH_PORT_STATUS_EV_DONE_MSB 9
+`define USBH_PORT_STATUS_EV_DONE_WIDTH 1
+`define USBH_PORT_STATUS_SLOT_ERR_LSB 10
+`define USBH_PORT_STATUS_SLOT_ERR_MSB 11
+`define USBH_PORT_STATUS_SLOT_ERR_WIDTH 2
+`define USBH_PORT_STATUS_FRAME_LSB 16
+`define USBH_PORT_STATUS_FRAME_MSB 26
+`define USBH_PORT_STATUS_FRAME_WIDTH 11
+
+// xfer -- The firmware's transaction. Writing starts it (fill tx first); port_status.busy until it is finished.
+`define USBH_XFER_OFFSET 32'h00000108
+`define USBH_XFER_STRIDE 32'h00000100
+`define USBH_XFER_COUNT 2
+`define USBH_XFER_ADDR(i) (`USBH_XFER_OFFSET + (i)*`USBH_XFER_STRIDE)
+`define USBH_XFER_ABS_ADDR(i) (`USBH_BASE + `USBH_XFER_ADDR(i))
+`define USBH_XFER_RESET 32'h00000000
+`define USBH_XFER_KIND_LSB 0
+`define USBH_XFER_KIND_MSB 1
+`define USBH_XFER_KIND_WIDTH 2
+`define USBH_XFER_EP_LSB 2
+`define USBH_XFER_EP_MSB 5
+`define USBH_XFER_EP_WIDTH 4
+`define USBH_XFER_TOGGLE_LSB 6
+`define USBH_XFER_TOGGLE_MSB 6
+`define USBH_XFER_TOGGLE_WIDTH 1
+`define USBH_XFER_LEN_LSB 7
+`define USBH_XFER_LEN_MSB 13
+`define USBH_XFER_LEN_WIDTH 7
+`define USBH_XFER_NAK_LIMIT_LSB 16
+`define USBH_XFER_NAK_LIMIT_MSB 23
+`define USBH_XFER_NAK_LIMIT_WIDTH 8
+
+// rx_pop -- The oldest word of the receive FIFO; reading takes it out. A record is its data bytes and then one end word.
+`define USBH_RX_POP_OFFSET 32'h0000010C
+`define USBH_RX_POP_STRIDE 32'h00000100
+`define USBH_RX_POP_COUNT 2
+`define USBH_RX_POP_ADDR(i) (`USBH_RX_POP_OFFSET + (i)*`USBH_RX_POP_STRIDE)
+`define USBH_RX_POP_ABS_ADDR(i) (`USBH_BASE + `USBH_RX_POP_ADDR(i))
+`define USBH_RX_POP_RESET 32'h00000000
+`define USBH_RX_POP_DATA_LSB 0
+`define USBH_RX_POP_DATA_MSB 7
+`define USBH_RX_POP_DATA_WIDTH 8
+`define USBH_RX_POP_END_LSB 8
+`define USBH_RX_POP_END_MSB 8
+`define USBH_RX_POP_END_WIDTH 1
+`define USBH_RX_POP_VALID_LSB 31
+`define USBH_RX_POP_VALID_MSB 31
+`define USBH_RX_POP_VALID_WIDTH 1
+
+// slot -- Port 0's two interrupt-IN polls. (Port 1's are `slot1` at 0x210.)
+`define USBH_SLOT_OFFSET 32'h00000110
+`define USBH_SLOT_STRIDE 32'h00000004
+`define USBH_SLOT_COUNT 2
+`define USBH_SLOT_ADDR(i) (`USBH_SLOT_OFFSET + (i)*`USBH_SLOT_STRIDE)
+`define USBH_SLOT_ABS_ADDR(i) (`USBH_BASE + `USBH_SLOT_ADDR(i))
+`define USBH_SLOT_RESET 32'h00000140
+`define USBH_SLOT_ENABLE_LSB 0
+`define USBH_SLOT_ENABLE_MSB 0
+`define USBH_SLOT_ENABLE_WIDTH 1
+`define USBH_SLOT_EP_LSB 1
+`define USBH_SLOT_EP_MSB 4
+`define USBH_SLOT_EP_WIDTH 4
+`define USBH_SLOT_INTERVAL_LSB 5
+`define USBH_SLOT_INTERVAL_MSB 12
+`define USBH_SLOT_INTERVAL_WIDTH 8
+
+// rx_level -- Words waiting in the receive FIFO, 0 to 1,024.
+`define USBH_RX_LEVEL_OFFSET 32'h00000120
+`define USBH_RX_LEVEL_STRIDE 32'h00000100
+`define USBH_RX_LEVEL_COUNT 2
+`define USBH_RX_LEVEL_ADDR(i) (`USBH_RX_LEVEL_OFFSET + (i)*`USBH_RX_LEVEL_STRIDE)
+`define USBH_RX_LEVEL_ABS_ADDR(i) (`USBH_BASE + `USBH_RX_LEVEL_ADDR(i))
+`define USBH_RX_LEVEL_RESET 32'h00000000
+
+// tx -- Port 0: the 64 bytes to send, byte 0 in bits 7:0 of word 0. Write only (reads 0). Port 1: 0x240.
+`define USBH_TX_OFFSET 32'h00000140
+`define USBH_TX_STRIDE 32'h00000004
+`define USBH_TX_COUNT 16
+`define USBH_TX_ADDR(i) (`USBH_TX_OFFSET + (i)*`USBH_TX_STRIDE)
+`define USBH_TX_ABS_ADDR(i) (`USBH_BASE + `USBH_TX_ADDR(i))
+`define USBH_TX_RESET 32'h00000000
+
+// slot1 -- Port 1's interrupt slots (fields as `slot`).
+`define USBH_SLOT1_OFFSET 32'h00000210
+`define USBH_SLOT1_STRIDE 32'h00000004
+`define USBH_SLOT1_COUNT 2
+`define USBH_SLOT1_ADDR(i) (`USBH_SLOT1_OFFSET + (i)*`USBH_SLOT1_STRIDE)
+`define USBH_SLOT1_ABS_ADDR(i) (`USBH_BASE + `USBH_SLOT1_ADDR(i))
+`define USBH_SLOT1_RESET 32'h00000140
+`define USBH_SLOT1_ENABLE_LSB 0
+`define USBH_SLOT1_ENABLE_MSB 0
+`define USBH_SLOT1_ENABLE_WIDTH 1
+`define USBH_SLOT1_EP_LSB 1
+`define USBH_SLOT1_EP_MSB 4
+`define USBH_SLOT1_EP_WIDTH 4
+`define USBH_SLOT1_INTERVAL_LSB 5
+`define USBH_SLOT1_INTERVAL_MSB 12
+`define USBH_SLOT1_INTERVAL_WIDTH 8
+
+// tx1 -- Port 1: the 64 bytes to send. Write only (reads 0).
+`define USBH_TX1_OFFSET 32'h00000240
+`define USBH_TX1_STRIDE 32'h00000004
+`define USBH_TX1_COUNT 16
+`define USBH_TX1_ADDR(i) (`USBH_TX1_OFFSET + (i)*`USBH_TX1_STRIDE)
+`define USBH_TX1_ABS_ADDR(i) (`USBH_BASE + `USBH_TX1_ADDR(i))
+`define USBH_TX1_RESET 32'h00000000
+
+`endif // SDR_REGMAP_USBH_VH

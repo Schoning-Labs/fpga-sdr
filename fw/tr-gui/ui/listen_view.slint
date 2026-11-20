@@ -1,0 +1,310 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// LISTEN view at 1920x1080 (docs/LISTEN.md): general receive in SSB, CW, AM, synchronous AM and FM
+// with free tuning. Same frame as the FT8 and FreeDV views: bands on top, the waterfall window the
+// logic draws (key color, `tr_gui::ft8::WATERFALL_RECT`) with a scale that marks the filter's pass
+// band, and the mode, filter, AGC and tuning controls under it. On the right are the frequency
+// display (click the upper or lower half of a digit, or turn the wheel over it), the step
+// selector, S-meter, volume and squelch. Receive only: there is no transmit control. The same view
+// sits inside `ListenScreen1920x1080` (host test) and `AppScreen1920x1080` (firmware).
+//
+// Font sizes are literal numbers on purpose, because the software renderer only embeds glyphs for
+// sizes it sees as literals (docs/S11_GUI.md, the font-size pitfall).
+
+import { Theme } from "components/theme.slint";
+import { ListenModel } from "listen_model.slint";
+
+component LButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> on: false;
+    in property <bool> enabled: true;
+    callback clicked();
+    background: on ? Theme.button-active : Theme.button-idle;
+    border-width: 1px;
+    border-color: on ? Theme.accent : Theme.panel-frame-active;
+    border-radius: 4px;
+    Text {
+        text: label;
+        color: !enabled ? Theme.panel-frame-active : on ? Theme.text-primary : Theme.text-dim;
+        font-size: 24px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    TouchArea {
+        enabled: enabled;
+        clicked => { root.clicked(); }
+    }
+}
+
+component LSmallButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> on: false;
+    callback clicked();
+    background: on ? Theme.button-active : Theme.button-idle;
+    border-width: 1px;
+    border-color: on ? Theme.accent : Theme.panel-frame-active;
+    border-radius: 4px;
+    Text {
+        text: label;
+        color: on ? Theme.text-primary : Theme.text-dim;
+        font-size: 18px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+// One digit of the frequency display: a click on its upper half tunes up by its value, on the lower
+// half down; the wheel over it does the same.
+component FreqDigit inherits Rectangle {
+    in property <int> digit;
+    in property <int> place;
+    in property <bool> dim;
+    width: 66px;
+    height: 160px;
+    border-radius: 4px;
+    background: area.has-hover ? Theme.button-idle : transparent;
+    Text {
+        text: "\{digit}";
+        color: dim ? Theme.panel-frame-active : Theme.text-primary;
+        font-size: 120px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    if area.has-hover: Text { y: 2px; width: parent.width; text: "+"; color: Theme.accent; font-size: 22px; horizontal-alignment: center; }
+    if area.has-hover: Text { y: parent.height - 28px; width: parent.width; text: "-"; color: Theme.accent; font-size: 22px; horizontal-alignment: center; }
+    area := TouchArea {
+        clicked => { ListenModel.request-tune-digit(place, self.pressed-y < parent.height / 2 ? 1 : -1); }
+        scroll-event(e) => {
+            if (e.delta-y > 0) {
+                ListenModel.request-tune-digit(place, 1);
+            } else if (e.delta-y < 0) {
+                ListenModel.request-tune-digit(place, -1);
+            }
+            accept
+        }
+    }
+}
+
+component Dot inherits Rectangle {
+    width: 28px;
+    height: 160px;
+    Rectangle { x: 9px; y: 128px; width: 10px; height: 10px; border-radius: 5px; background: Theme.text-dim; }
+}
+
+export component ListenView inherits Rectangle {
+    width: 1920px;
+    height: 1080px;
+    background: Theme.panel-background;
+
+    // ---------------------------------------------------------------- top bar, y 8..80
+    Text { x: 16px; y: 14px; text: "LISTEN"; color: Theme.accent; font-size: 44px; font-weight: 700; }
+    LSmallButton { x: 196px; y: 22px; width: 80px; height: 44px; label: "FT8"; clicked => { ListenModel.request-switch-to-ft8(); } }
+    LSmallButton { x: 284px; y: 22px; width: 116px; height: 44px; label: "FreeDV"; clicked => { ListenModel.request-switch-to-freedv(); } }
+    for name[i] in ListenModel.band-names: LSmallButton {
+        x: 430px + i * 66px;
+        y: 22px;
+        width: 60px;
+        height: 44px;
+        label: name;
+        on: i == ListenModel.band-index;
+        clicked => { ListenModel.request-band-select(i); }
+    }
+    Text { x: 1180px; y: 18px; width: 724px; text: ListenModel.link-text; color: ListenModel.link-ok ? Theme.accent-good : Theme.accent-warn; font-size: 18px; horizontal-alignment: right; overflow: elide; }
+    Text { x: 1180px; y: 48px; width: 724px; text: ListenModel.hl2-text; color: Theme.text-dim; font-size: 18px; horizontal-alignment: right; overflow: elide; }
+    Rectangle { x: 16px; y: 84px; width: 1888px; height: 2px; background: Theme.panel-frame; }
+
+    // ---------------------------------------------------------------- waterfall, left
+    // Frame 16..1196 x 104..784; the key-color area inside is WATERFALL_RECT (20, 124, 1172, 656).
+    Rectangle {
+        x: 16px; y: 104px; width: 1180px; height: 680px;
+        background: Theme.panel-frame;
+        border-width: 1px;
+        border-color: Theme.panel-frame-active;
+        Text { x: 6px; y: 1px; text: ListenModel.scale-note; color: Theme.text-dim; font-size: 13px; }
+    }
+    Rectangle { x: 20px; y: 124px; width: 1172px; height: 656px; background: Theme.key-colour; }
+    // a click tunes to that frequency, the wheel tunes by the step
+    TouchArea {
+        x: 20px; y: 124px; width: 1172px; height: 656px;
+        clicked => { ListenModel.request-waterfall-click(round(self.pressed-x / 1px)); }
+        scroll-event(e) => {
+            if (e.delta-y > 0) {
+                ListenModel.request-tune-steps(1);
+            } else if (e.delta-y < 0) {
+                ListenModel.request-tune-steps(-1);
+            }
+            accept
+        }
+    }
+
+    // Scale under the waterfall, y 788..836: ticks in kHz from the tuned frequency, the filter's
+    // pass band as a bar, the tuned frequency as a white mark.
+    Rectangle {
+        x: 20px; y: 788px; width: 1172px; height: 48px;
+        background: Theme.button-idle;
+        Rectangle {
+            x: ListenModel.passband-x0 * 1px; y: 0px;
+            width: (ListenModel.passband-x1 - ListenModel.passband-x0) * 1px; height: 12px;
+            background: Theme.accent;
+        }
+        for t in ListenModel.ticks: Rectangle {
+            x: t.x * 1px; y: 12px; width: 1px; height: 12px; background: Theme.text-dim;
+            Text { x: 4px; y: 12px; text: t.text; color: Theme.text-dim; font-size: 15px; }
+        }
+        Rectangle { x: ListenModel.centre-x * 1px - 1px; y: 0px; width: 3px; height: 24px; background: Theme.text-primary; }
+        Text { x: parent.width - 40px; y: 26px; text: "kHz"; color: Theme.text-dim; font-size: 15px; }
+    }
+
+    // ---------------------------------------------------------------- controls, y 848..1064
+    Rectangle {
+        x: 16px; y: 848px; width: 1180px; height: 216px;
+        background: Theme.panel-frame;
+        border-width: 1px;
+        border-color: Theme.panel-frame-active;
+    }
+    for m[i] in ["LSB", "USB", "CW", "AM", "SAM", "FM"]: LButton {
+        x: 32px + i * 128px; y: 864px; width: 116px; height: 84px;
+        label: m;
+        on: i == ListenModel.mode-index;
+        clicked => { ListenModel.request-mode(i); }
+    }
+    LButton {
+        x: 808px; y: 864px; width: 154px; height: 84px;
+        label: !ListenModel.agc-available ? "AGC -" : ListenModel.agc-on ? "AGC ON" : "AGC OFF";
+        on: ListenModel.agc-on && ListenModel.agc-available;
+        enabled: ListenModel.agc-available;
+        clicked => { ListenModel.request-agc-toggle(); }
+    }
+    for f[i] in ListenModel.filter-names: LButton {
+        x: 32px + i * 168px; y: 964px; width: 156px; height: 84px;
+        label: f;
+        on: i == ListenModel.filter-index;
+        clicked => { ListenModel.request-filter(i); }
+    }
+    LButton { x: 560px; y: 964px; width: 194px; height: 84px; label: "< " + ListenModel.step-text; clicked => { ListenModel.request-tune-steps(-1); } }
+    LButton { x: 768px; y: 964px; width: 194px; height: 84px; label: ListenModel.step-text + " >"; clicked => { ListenModel.request-tune-steps(1); } }
+    Text { x: 980px; y: 870px; width: 200px; text: "Receive only"; color: Theme.text-dim; font-size: 18px; horizontal-alignment: right; }
+    // The HL2's RX gain: - value +, and the RF AGC's AUTO/MANUAL button under it.
+    Text { x: 980px; y: 898px; text: "RF gain"; color: Theme.text-dim; font-size: 18px; }
+    LButton { x: 980px; y: 930px; width: 52px; height: 48px; label: "-"; clicked => { ListenModel.request-rf-gain-step(-1); } }
+    Text { x: 1036px; y: 930px; width: 92px; height: 48px; text: ListenModel.rf-gain-text; color: Theme.text-primary; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
+    LButton { x: 1132px; y: 930px; width: 52px; height: 48px; label: "+"; clicked => { ListenModel.request-rf-gain-step(1); } }
+    LButton {
+        x: 980px; y: 990px; width: 204px; height: 58px;
+        label: ListenModel.rf-agc-auto ? "AUTO" : "MANUAL";
+        on: ListenModel.rf-agc-auto;
+        clicked => { ListenModel.request-rf-agc-toggle(); }
+    }
+
+    // ---------------------------------------------------------------- receiver, right
+    Rectangle {
+        x: 1212px; y: 104px; width: 692px; height: 960px;
+        background: Theme.panel-frame;
+        border-width: 1px;
+        border-color: Theme.panel-frame-active;
+    }
+    // Frequency display: 8 digits, 10 MHz to 1 Hz, dots after the MHz and the kHz.
+    for d[k] in ListenModel.digits: FreqDigit {
+        x: 1236px + k * 76px + (k >= 2 ? 28px : 0px) + (k >= 5 ? 28px : 0px);
+        y: 110px;
+        digit: d;
+        place: 7 - k;
+        dim: k < ListenModel.lead-zeros;
+    }
+    Dot { x: 1388px; y: 110px; }
+    Dot { x: 1644px; y: 110px; }
+    Text { x: 1236px; y: 270px; width: 142px; text: "MHz"; color: Theme.text-dim; font-size: 16px; horizontal-alignment: center; }
+    Text { x: 1416px; y: 270px; width: 218px; text: "kHz"; color: Theme.text-dim; font-size: 16px; horizontal-alignment: center; }
+    Text { x: 1672px; y: 270px; width: 218px; text: "Hz"; color: Theme.text-dim; font-size: 16px; horizontal-alignment: center; }
+
+    // Tuning step
+    Text { x: 1228px; y: 306px; text: "Step"; color: Theme.text-dim; font-size: 20px; }
+    for s[i] in ListenModel.step-names: LSmallButton {
+        x: 1228px + mod(i, 5) * 133px;
+        y: 340px + floor(i / 5) * 52px;
+        width: 126px;
+        height: 44px;
+        label: s;
+        on: i == ListenModel.step-index;
+        clicked => { ListenModel.request-step(i); }
+    }
+
+    // S-meter
+    Text { x: 1228px; y: 466px; text: "S-meter"; color: Theme.text-dim; font-size: 20px; }
+    Text { x: 1428px; y: 452px; width: 460px; text: ListenModel.smeter-text; color: Theme.text-primary; font-size: 40px; font-weight: 700; horizontal-alignment: right; }
+    Rectangle {
+        x: 1228px; y: 504px; width: 660px; height: 30px; background: Theme.button-idle;
+        Rectangle { x: 0px; width: parent.width * ListenModel.smeter-fraction; background: ListenModel.squelch-open ? Theme.accent-good : Theme.accent; }
+        if ListenModel.squelch-on: Rectangle { x: parent.width * ListenModel.squelch-fraction - 1px; width: 3px; background: Theme.accent-warn; }
+    }
+    for t[i] in ["-140", "-110", "-80", "-50", "-20"]: Text {
+        x: 1228px + i * 165px - (i == 4 ? 36px : i == 0 ? 0px : 18px);
+        y: 538px;
+        text: t;
+        color: Theme.text-dim;
+        font-size: 14px;
+    }
+    Text { x: 1836px; y: 556px; width: 52px; text: "dBFS"; color: Theme.text-dim; font-size: 14px; horizontal-alignment: right; }
+
+    // Volume
+    Text { x: 1228px; y: 596px; text: "Volume"; color: Theme.text-dim; font-size: 20px; }
+    Text { x: 1628px; y: 590px; width: 260px; text: ListenModel.volume-text; color: Theme.text-primary; font-size: 28px; font-weight: 600; horizontal-alignment: right; }
+    LButton { x: 1228px; y: 632px; width: 62px; height: 48px; label: "-"; clicked => { ListenModel.request-volume-step(-5); } }
+    Rectangle {
+        x: 1302px; y: 644px; width: 512px; height: 24px; background: Theme.button-idle;
+        Rectangle { x: 0px; width: parent.width * ListenModel.volume-pct / 100; background: Theme.accent; }
+    }
+    LButton { x: 1826px; y: 632px; width: 62px; height: 48px; label: "+"; clicked => { ListenModel.request-volume-step(5); } }
+
+    // Squelch
+    Text { x: 1228px; y: 706px; text: "Squelch"; color: Theme.text-dim; font-size: 20px; }
+    LButton {
+        x: 1228px; y: 740px; width: 150px; height: 48px;
+        label: ListenModel.squelch-on ? "ON" : "OFF";
+        on: ListenModel.squelch-on;
+        clicked => { ListenModel.request-squelch-toggle(); }
+    }
+    LButton { x: 1390px; y: 740px; width: 62px; height: 48px; label: "-"; clicked => { ListenModel.request-squelch-step(-2); } }
+    Text { x: 1458px; y: 740px; width: 142px; height: 48px; text: ListenModel.squelch-text; color: Theme.text-primary; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
+    LButton { x: 1606px; y: 740px; width: 62px; height: 48px; label: "+"; clicked => { ListenModel.request-squelch-step(2); } }
+    Rectangle {
+        x: 1690px; y: 740px; width: 198px; height: 48px; border-radius: 4px;
+        background: !ListenModel.squelch-on ? Theme.button-idle : ListenModel.squelch-open ? Theme.accent-good : Theme.button-idle;
+        border-width: 1px;
+        border-color: Theme.panel-frame-active;
+        Text {
+            text: !ListenModel.squelch-on ? "-" : ListenModel.squelch-open ? "OPEN" : "CLOSED";
+            color: ListenModel.squelch-on && ListenModel.squelch-open ? #0a0a0a : Theme.text-dim;
+            font-size: 20px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center;
+        }
+    }
+
+    // Receiver and audio
+    Rectangle { x: 1228px; y: 812px; width: 660px; height: 1px; background: Theme.panel-frame-active; }
+    Text { x: 1228px; y: 826px; width: 660px; text: ListenModel.info-text; color: Theme.text-dim; font-size: 18px; overflow: elide; }
+    Text { x: 1228px; y: 860px; width: 660px; text: ListenModel.audio-text; color: ListenModel.audio-ok ? Theme.text-dim : Theme.accent-warn; font-size: 18px; overflow: elide; }
+
+    // Waterfall controls, one row: sensitivity (+ is brighter), contrast (the range from black to
+    // white in dB) and speed (lines per second), each as - value +, and Auto (sensitivity back to
+    // the automatic floor).
+    Rectangle { x: 1228px; y: 900px; width: 660px; height: 1px; background: Theme.panel-frame-active; }
+    Text { x: 1228px; y: 912px; text: "Sensitivity"; color: Theme.text-dim; font-size: 20px; }
+    Text { x: 1418px; y: 912px; text: "Contrast"; color: Theme.text-dim; font-size: 20px; }
+    Text { x: 1608px; y: 912px; text: "Speed"; color: Theme.text-dim; font-size: 20px; }
+    LButton { x: 1228px; y: 942px; width: 44px; height: 44px; label: "-"; enabled: ListenModel.wf-available; clicked => { ListenModel.request-wf-sensitivity-step(-1); } }
+    Text { x: 1276px; y: 942px; width: 84px; height: 44px; text: ListenModel.wf-sensitivity-text; color: Theme.text-primary; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
+    LButton { x: 1364px; y: 942px; width: 44px; height: 44px; label: "+"; enabled: ListenModel.wf-available; clicked => { ListenModel.request-wf-sensitivity-step(1); } }
+    LButton { x: 1418px; y: 942px; width: 44px; height: 44px; label: "-"; enabled: ListenModel.wf-available; clicked => { ListenModel.request-wf-range-step(-1); } }
+    Text { x: 1466px; y: 942px; width: 84px; height: 44px; text: ListenModel.wf-range-text; color: Theme.text-primary; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
+    LButton { x: 1554px; y: 942px; width: 44px; height: 44px; label: "+"; enabled: ListenModel.wf-available; clicked => { ListenModel.request-wf-range-step(1); } }
+    LButton { x: 1608px; y: 942px; width: 44px; height: 44px; label: "-"; enabled: ListenModel.wf-available; clicked => { ListenModel.request-wf-speed-step(-1); } }
+    Text { x: 1656px; y: 942px; width: 84px; height: 44px; text: ListenModel.wf-speed-text; color: Theme.text-primary; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
+    LButton { x: 1744px; y: 942px; width: 44px; height: 44px; label: "+"; enabled: ListenModel.wf-available; clicked => { ListenModel.request-wf-speed-step(1); } }
+    LButton { x: 1798px; y: 942px; width: 90px; height: 44px; label: "Auto"; enabled: ListenModel.wf-available; clicked => { ListenModel.request-wf-sensitivity-auto(); } }
+}

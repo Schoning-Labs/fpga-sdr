@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "tr-input"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Mouse and keyboard of a PC over UDP into the radio's GUI: packet format, parser, applier, transmit-key block (docs/NETINPUT.md)"
+
+[dependencies]
+tr-usbh = { path = "../tr-usbh" }

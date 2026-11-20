@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+target/
+*.vcd
+*.fst
+sim_build/
+__pycache__/
+impl/
+*.log
+captures/
+sim/out/
+sim/ft8/out/
+sim/rx/out/
+sim/zoom/out/
+tools/gen_signals/out/
+*.vvp
+obj_dir_*/
+sim/rx_backend/out/
+sim/ft8/vectors/qso1_small_*.hex
+sim/ft8/vectors/qso3_busy_small_*.hex
+sim/ft8/vectors/f6_qso1_*.hex
+
+# Built images: bitstreams and firmware images are never committed (README, section on images)
+*.fs
+*.img
+*.vo
+*.rpt.txt
+gowin/impl/
+fw/target/
+.claude/

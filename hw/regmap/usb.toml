@@ -1,0 +1,185 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[block]
+name = "usb"
+base = 0xE80E_0000
+size = 0x0001_0000
+status = "final"
+description = """
+USB audio device on the "Custom USB" socket (docs/USB_AUDIO.md, rtl/usb/usb_regs.v): the board as a
+class-compliant sound card, 48 kHz 16-bit stereo both ways. The device enumerates and streams
+without firmware; this page is status, the playback samples for the CPU, and three switches.
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x5553_0001
+description = "Block identifier/version: 'US' + version 1."
+
+[[register]]
+name = "ctrl"
+offset = 0x004
+description = "Switches."
+
+[[register.field]]
+name = "connect"
+bits = "0"
+access = "RW"
+reset = 1
+description = "1 = the 1.5 kohm pull-up on D+ is on: the PC sees a device. 0 then 1 makes the PC enumerate again."
+
+[[register.field]]
+name = "fifo_en"
+bits = "1"
+access = "RW"
+reset = 0
+description = "1 = playback samples from the PC are stored in the CPU FIFO (fifo_level, fifo_data). 0 = the FIFO is empty and interrupt line 12 is low."
+
+[[register.field]]
+name = "monitor"
+bits = "2"
+access = "RW"
+reset = 0
+description = "1 = the PC's playback is added to the stream of the digital outputs (HDMI, S/PDIF, I2S), saturating. Not to the headphone DAC. Not to what the PC records."
+
+[[register.field]]
+name = "loopback"
+bits = "3"
+access = "RW"
+reset = 0
+description = "1 = the PC records its own playback instead of the receiver audio (test: PC to radio and back, sample for sample)."
+
+[[register.field]]
+name = "speech_src"
+bits = "4"
+access = "RW"
+reset = 0
+description = "What fills the CPU FIFO (the speech input): 0 = the PC's playback on the Custom USB socket, 1 = the microphone of a headset on the USB host board (docs/USB_HOST.md section 5; its samples come at the device's own rate)."
+
+[[register]]
+name = "status"
+offset = 0x008
+description = "State of the device. Bits from the USB clock are synchronised one by one."
+
+[[register.field]]
+name = "configured"
+bits = "0"
+access = "RO"
+reset = 0
+description = "1 = a PC has enumerated and configured the device."
+
+[[register.field]]
+name = "play_on"
+bits = "1"
+access = "RO"
+reset = 0
+description = "1 = the PC has the playback interface switched on (it is sending audio, possibly silence)."
+
+[[register.field]]
+name = "cap_on"
+bits = "2"
+access = "RO"
+reset = 0
+description = "1 = the PC has the recording interface switched on."
+
+[[register.field]]
+name = "play_run"
+bits = "3"
+access = "RO"
+reset = 0
+description = "1 = the playback reader is taking samples; 0 = it waits for 96 samples (start, or after an under-run)."
+
+[[register.field]]
+name = "play_fill"
+bits = "24:16"
+access = "RO"
+reset = 0
+description = "Samples in the playback buffer between USB and the radio (0 to 256; about 72 to 120 in normal running)."
+
+[[register]]
+name = "fifo_level"
+offset = 0x00C
+access = "RO"
+reset = 0
+description = "Stereo samples waiting in the CPU FIFO, 0 to 1,024."
+
+[[register]]
+name = "fifo_data"
+offset = 0x010
+access = "RO"
+reset = 0
+description = "The oldest sample of the CPU FIFO: left in bits 15:0, right in bits 31:16, signed. Reading takes it out. 0 when the FIFO is empty."
+
+[[register]]
+name = "fifo_mark"
+offset = 0x014
+access = "RW"
+reset = 512
+description = "High-water mark, 1 to 1,024: interrupt line 12 is high while fifo_level is at or above it (and ctrl.fifo_en is 1). 512 = 10.7 ms."
+
+[[register]]
+name = "play_errors"
+offset = 0x018
+description = "Playback faults. Counters wrap at 65,535. Expected: both stay still while a PC plays."
+
+[[register.field]]
+name = "underruns"
+bits = "15:0"
+access = "RO"
+reset = 0
+description = "Times the playback buffer ran empty while the PC had playback on (zeros went out, the reader started again)."
+
+[[register.field]]
+name = "overruns"
+bits = "31:16"
+access = "RO"
+reset = 0
+description = "Playback samples dropped because the buffer was full (the PC sends faster than the feedback asks)."
+
+[[register]]
+name = "more_errors"
+offset = 0x01C
+description = "Further faults. Counters wrap at 65,535."
+
+[[register.field]]
+name = "cap_overruns"
+bits = "15:0"
+access = "RO"
+reset = 0
+description = "Recording samples dropped because the PC had recording on and did not fetch them."
+
+[[register.field]]
+name = "fifo_overruns"
+bits = "31:16"
+access = "RO"
+reset = 0
+description = "Playback samples dropped at the CPU FIFO because the firmware did not read fast enough."
+
+[[register]]
+name = "play_bad"
+offset = 0x020
+access = "RO"
+reset = 0
+description = "Playback packets dropped for a checksum error (16 bits, wraps). A bad cable shows here."
+
+[[register]]
+name = "levels"
+offset = 0x024
+description = "Peak meters: the largest magnitude of either channel since the last read of this register. Reading clears both."
+
+[[register.field]]
+name = "play_peak"
+bits = "14:0"
+access = "RO"
+reset = 0
+description = "Playback (PC to radio), 0 to 32,767."
+
+[[register.field]]
+name = "cap_peak"
+bits = "30:16"
+access = "RO"
+reset = 0
+description = "What the PC records (receiver audio, or the playback with ctrl.loopback), 0 to 32,767."

@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// The AGC speed selector (Off, Slow, Med, Fast) as a `ButtonRow` bound to `PanelModel`.
+
+import { ButtonRow } from "button_row.slint";
+import { PanelModel } from "../model.slint";
+
+export component AgcControl inherits ButtonRow {
+    title: "AGC";
+    labels: PanelModel.agc-names;
+    active-index: PanelModel.active-agc-index;
+    selected(i) => { PanelModel.request-agc-select(i); }
+}

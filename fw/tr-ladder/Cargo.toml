@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Start-up program of the bring-up ladder (docs/LADDER.md): runs in place from the board's flash
+# at 0x8000_0000 (written at chip offset 0x60_0000 with the Gowin programmer), keeps data and stack in the
+# processor's own DLM and needs neither DDR3 nor the UART loader to start. Written for the ladder bitstreams of this
+# repository (rtl/top/ladder_top.v). Firmware-only: always no_std, cross-built for
+# riscv32imafc-unknown-none-elf, not a default workspace member.
+
+[package]
+name = "tr-ladder"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "bring-up ladder start-up program: console report and DDR3 test of ladder steps 1 to 3"
+build = "build.rs"
+
+[dependencies]
+tr-ae350 = { path = "../tr-ae350", default-features = false }
+riscv = "0.16"
+riscv-rt = { version = "0.18", features = ["single-hart"] }
+
+[features]
+default = ["board-ae350"]
+board-ae350 = ["tr-ae350/board-ae350"]
+
+[[bin]]
+name = "tr-ladder"
+path = "src/main.rs"

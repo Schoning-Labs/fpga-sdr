@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Stage-0 loader (docs/C2_LOADER.md). Firmware-only, like tr-ae350 (see that crate's
+# Cargo.toml comment): it is always no_std and cross-built for riscv32imafc-unknown-none-elf, and it is
+# never built for the host with `cargo test`, because the logic in this crate (UART framing and flash
+# programming) is checked under QEMU (tools/qemu_c2.sh) the same way tr-ae350 is checked under
+# tools/qemu_c1.sh, and not by host unit tests. The image format it uses (tr-image) is host-tested on its own.
+
+[package]
+name = "tr-loader"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "stage-0 flash/UART loader: image format is tr-image, board logic here"
+build = "build.rs"
+
+[dependencies]
+tr-ae350 = { path = "../tr-ae350", default-features = false }
+tr-image = { path = "../tr-image", default-features = false }
+tr-loader-layout = { path = "../tr-loader-layout" }
+riscv = "0.16"
+riscv-rt = { version = "0.18", features = ["single-hart"] }
+
+[features]
+# See fw/tr-ae350/Cargo.toml for what these select; tr-loader forwards to tr-ae350's own board
+# features so board.rs's addresses and this crate's flash/DDR3 destination windows
+# (src/layout.rs) always agree on which board is being built for.
+default = ["board-ae350"]
+board-ae350 = ["tr-ae350/board-ae350"]
+board-qemu = ["tr-ae350/board-qemu"]
+
+[[bin]]
+name = "stage0"
+path = "src/bin/stage0.rs"

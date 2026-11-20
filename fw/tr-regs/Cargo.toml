@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "tr-regs"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "generated register access, from hw/regmap/"
+
+[dependencies]
+
+[features]
+# Only for tests (see [dev-dependencies] below): the mock register space is never built into
+# firmware. Activating it directly is only useful for another crate's own test code.
+mock = []
+
+[dev-dependencies]
+# Self-dependency with the `mock` feature turned on, so `tests/*.rs` integration tests (which
+# link against the crate as an ordinary dependency, not with #[cfg(test)] visibility) can see
+# `tr_regs::mock`. See docs/REGMAP.md "Generated Rust: RegisterSpace and the mock".
+tr-regs = { path = ".", features = ["mock"] }

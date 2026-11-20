@@ -1,0 +1,27 @@
+tr-codec2: a Rust port of parts of Codec 2
+==========================================
+
+This crate is a translation into Rust of parts of Codec 2, release 1.2.0
+(https://github.com/drowe67/codec2):
+
+  src/codec2.c, src/newamp1.c, src/phase.c, src/postfilter.c, src/sine.c,
+  src/quantise.c, src/pack.c, src/nlp.c, src/mbest.c
+  src/codebook/train_120_1.txt, train_120_2.txt, newamp1_energy_q.txt
+
+Codec 2 is Copyright (C) 1990-2020 David Rowe and contributors and is licensed
+under the GNU Lesser General Public License version 2.1 (file COPYING.LGPL-2.1
+in this directory). A translation is a modified version of the Library in the
+sense of that licence, so this crate carries the same licence:
+SPDX-License-Identifier: LGPL-2.1-only.
+
+Modified 2026 by Franz Schöning, https://www.schoning.com: translated from C to
+Rust, no heap, no file input or output, only the 700C mode, own FFT.
+
+Use inside fpga-sdr: the repository is Apache-2.0, but the firmware image is one work and is GPL-3.0. Section 3 of the
+LGPL 2.1 allows any copy of the Library to be distributed under the ordinary GNU
+General Public License, version 2 or any later version, instead. The firmware
+image that contains this crate is distributed under GPL-3.0 on that
+basis. The source of this crate stays under LGPL-2.1-only so that it can be
+given back to the Codec 2 project.
+
+The algorithm is by David Rowe. See also docs/FREEDV.md in the repository.

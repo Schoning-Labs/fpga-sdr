@@ -1,0 +1,217 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// FreeDV receive view at 1920x1080 (docs/FREEDV.md section 9), in the style of the FT8 view: band
+// and dial frequency on top, the waterfall window the logic draws (key color, the same rectangle
+// as the FT8 view's, `tr_gui::ft8::WATERFALL_RECT`) with a frequency scale, the mode, squelch and
+// tuning controls under it, and on the right what the receiver reports: sync, SNR, frequency
+// offset, errors, and the text channel. The geometry is fixed on purpose, because the firmware
+// places the waterfall window on the key color rectangle and the host test clicks by position.
+// The same view sits inside `FdvScreen1920x1080` (host test) and `AppScreen1920x1080` (firmware).
+
+import { Theme } from "components/theme.slint";
+import { FdvModel } from "fdv_model.slint";
+
+component FdvButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> on: false;
+    in property <brush> ink: Theme.text-primary;
+    in property <length> text-size: 26px;
+    callback clicked();
+    background: on ? Theme.button-active : Theme.button-idle;
+    border-width: 1px;
+    border-color: on ? Theme.accent : Theme.panel-frame-active;
+    border-radius: 4px;
+    Text {
+        text: label;
+        color: ink;
+        font-size: text-size;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+component FdvBandButton inherits Rectangle {
+    in property <int> index;
+    property <bool> on: index == FdvModel.band-index;
+    width: 62px;
+    height: 44px;
+    background: on ? Theme.button-active : Theme.button-idle;
+    border-width: 1px;
+    border-color: on ? Theme.accent : Theme.panel-frame-active;
+    border-radius: 4px;
+    Text {
+        text: FdvModel.band-names[index];
+        color: on ? Theme.text-primary : Theme.text-dim;
+        font-size: 18px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    TouchArea {
+        clicked => { FdvModel.request-band-select(index); }
+    }
+}
+
+component Lamp inherits Rectangle {
+    in property <string> label;
+    in property <bool> lit;
+    in property <brush> colour: Theme.accent-good;
+    height: 40px;
+    border-radius: 4px;
+    background: lit ? colour : Theme.button-idle;
+    border-width: 1px;
+    border-color: Theme.panel-frame-active;
+    Text {
+        text: label;
+        color: lit ? #0a0a0a : Theme.text-dim;
+        font-size: 20px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component FdvView inherits Rectangle {
+    width: 1920px;
+    height: 1080px;
+    background: Theme.panel-background;
+
+    // ---------------------------------------------------------------- top bar, y 8..80
+    Text { x: 16px; y: 14px; text: "FreeDV"; color: Theme.accent; font-size: 44px; font-weight: 700; }
+    FdvButton {
+        x: 176px; y: 22px; width: 76px; height: 44px;
+        label: "< FT8";
+        text-size: 18px;
+        clicked => { FdvModel.request-switch-to-ft8(); }
+    }
+
+    FdvButton {
+        x: 680px; y: 22px; width: 120px; height: 44px;
+        label: "LISTEN";
+        text-size: 18px;
+        clicked => { FdvModel.request-switch-to-listen(); }
+    }
+
+    for name[i] in FdvModel.band-names: FdvBandButton {
+        x: 260px + i * 68px;
+        y: 22px;
+        index: i;
+    }
+
+    Text { x: 960px; y: 10px; width: 400px; text: FdvModel.dial-text; color: Theme.text-primary; font-size: 52px; font-weight: 700; horizontal-alignment: right; }
+    Text { x: 1368px; y: 40px; text: "Hz"; color: Theme.text-dim; font-size: 18px; }
+    Text { x: 1430px; y: 10px; width: 220px; text: FdvModel.sideband-text; color: Theme.text-primary; font-size: 44px; font-weight: 600; horizontal-alignment: right; }
+    Rectangle {
+        x: 1670px; y: 20px; width: 234px; height: 44px;
+        border-radius: 4px;
+        background: Theme.accent;
+        Text { text: FdvModel.mode-text; color: #0a0a0a; font-size: 26px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+    }
+    Rectangle { x: 16px; y: 84px; width: 1888px; height: 2px; background: Theme.panel-frame; }
+
+    // ---------------------------------------------------------------- waterfall, left
+    // Frame 16..1196 x 104..784; the key-color area inside is WATERFALL_RECT (20, 124, 1172, 656).
+    Rectangle {
+        x: 16px; y: 104px; width: 1180px; height: 680px;
+        background: Theme.panel-frame;
+        border-width: 1px;
+        border-color: Theme.panel-frame-active;
+        Text { x: 6px; y: 1px; text: "waterfall (drawn by the FPGA)  " + FdvModel.scale-note; color: Theme.text-dim; font-size: 13px; }
+    }
+    Rectangle { x: 20px; y: 124px; width: 1172px; height: 656px; background: Theme.key-colour; }
+
+    // Frequency scale under the waterfall, y 788..836: ticks every 250 Hz of audio, a green marker at
+    // the sender's signal center, a white one at the nominal 1,500 Hz.
+    Rectangle {
+        x: 20px; y: 788px; width: 1172px; height: 48px;
+        background: Theme.button-idle;
+        for t in FdvModel.ticks: Rectangle {
+            x: t.x * 1px; width: 1px; height: 14px; background: Theme.text-dim;
+            Text { x: 4px; y: 14px; text: t.text; color: Theme.text-dim; font-size: 15px; }
+        }
+        Rectangle { x: FdvModel.nominal-x * 1px - 1px; y: 0px; width: 3px; height: 10px; background: Theme.text-primary; }
+        if FdvModel.signal-visible: Rectangle { x: FdvModel.signal-x * 1px - 3px; y: 10px; width: 7px; height: 12px; background: Theme.accent-good; }
+    }
+
+    // ---------------------------------------------------------------- controls, y 848..1064
+    Rectangle {
+        x: 16px; y: 848px; width: 1180px; height: 216px;
+        background: Theme.panel-frame;
+        border-width: 1px;
+        border-color: Theme.panel-frame-active;
+    }
+    FdvButton { x: 32px; y: 864px; width: 140px; height: 84px; label: "700D"; on: FdvModel.mode-d; text-size: 30px; clicked => { FdvModel.request-mode(true); } }
+    FdvButton { x: 184px; y: 864px; width: 140px; height: 84px; label: "700E"; on: !FdvModel.mode-d; text-size: 30px; clicked => { FdvModel.request-mode(false); } }
+    FdvButton {
+        x: 344px; y: 864px; width: 260px; height: 84px;
+        label: FdvModel.squelch-on ? "SQUELCH ON" : "SQUELCH OFF";
+        on: FdvModel.squelch-on;
+        text-size: 26px;
+        clicked => { FdvModel.request-squelch-toggle(); }
+    }
+    FdvButton { x: 624px; y: 864px; width: 70px; height: 84px; label: "-"; text-size: 40px; clicked => { FdvModel.request-squelch-step(-1); } }
+    Text { x: 700px; y: 864px; width: 170px; height: 84px; text: FdvModel.squelch-text; color: Theme.text-primary; font-size: 24px; horizontal-alignment: center; vertical-alignment: center; }
+    FdvButton { x: 876px; y: 864px; width: 70px; height: 84px; label: "+"; text-size: 40px; clicked => { FdvModel.request-squelch-step(1); } }
+
+    FdvButton { x: 32px; y: 964px; width: 200px; height: 84px; label: "< 100 Hz"; text-size: 26px; clicked => { FdvModel.request-tune(-100); } }
+    FdvButton { x: 244px; y: 964px; width: 200px; height: 84px; label: "100 Hz >"; text-size: 26px; clicked => { FdvModel.request-tune(100); } }
+    Text { x: 464px; y: 962px; width: 720px; text: FdvModel.audio-text; color: FdvModel.audio-ok ? Theme.text-dim : Theme.accent-warn; font-size: 20px; overflow: elide; }
+    Text { x: 464px; y: 1010px; width: 720px; text: FdvModel.link-text; color: FdvModel.link-ok ? Theme.accent-good : Theme.accent-warn; font-size: 18px; overflow: elide; }
+
+    // ---------------------------------------------------------------- receiver, right
+    Rectangle {
+        x: 1212px; y: 104px; width: 692px; height: 960px;
+        background: Theme.panel-frame;
+        border-width: 1px;
+        border-color: Theme.panel-frame-active;
+    }
+    // Sync
+    Rectangle {
+        x: 1228px; y: 120px; width: 660px; height: 110px;
+        border-radius: 6px;
+        background: FdvModel.sync-level == 2 ? Theme.accent-good : FdvModel.sync-level == 1 ? Theme.accent-warn : Theme.button-idle;
+        Text { text: FdvModel.sync-text; color: FdvModel.sync-level == 0 ? Theme.text-dim : #0a0a0a; font-size: 60px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+    }
+    // SNR
+    Text { x: 1228px; y: 250px; text: "SNR"; color: Theme.text-dim; font-size: 20px; }
+    Text { x: 1428px; y: 236px; width: 460px; text: FdvModel.snr-text; color: Theme.text-primary; font-size: 52px; font-weight: 700; horizontal-alignment: right; }
+    Rectangle {
+        x: 1228px; y: 306px; width: 660px; height: 18px; background: Theme.button-idle;
+        Rectangle { x: 0px; width: parent.width * FdvModel.snr-fraction; background: Theme.accent; }
+    }
+    // Frequency offset: the tuning aid, the center is on frequency
+    Text { x: 1228px; y: 350px; text: "Frequency offset"; color: Theme.text-dim; font-size: 20px; }
+    Text { x: 1428px; y: 336px; width: 460px; text: FdvModel.foff-text; color: Theme.text-primary; font-size: 52px; font-weight: 700; horizontal-alignment: right; }
+    Rectangle {
+        x: 1228px; y: 406px; width: 660px; height: 30px; background: Theme.button-idle;
+        Rectangle { x: parent.width / 2 - 1px; width: 2px; background: Theme.text-dim; }
+        Rectangle {
+            x: parent.width / 2 + parent.width / 2 * FdvModel.foff-fraction - 6px; width: 12px;
+            background: Math.abs(FdvModel.foff-fraction) < 0.15 ? Theme.accent-good : Theme.accent-warn;
+        }
+    }
+    Text { x: 1228px; y: 438px; text: "-100"; color: Theme.text-dim; font-size: 14px; }
+    Text { x: 1534px; y: 438px; text: "0"; color: Theme.text-dim; font-size: 14px; }
+    Text { x: 1840px; y: 438px; width: 48px; text: "+100"; color: Theme.text-dim; font-size: 14px; horizontal-alignment: right; }
+    // Errors
+    Text { x: 1228px; y: 480px; width: 660px; text: FdvModel.uw-text; color: Theme.text-primary; font-size: 24px; }
+    Text { x: 1228px; y: 516px; width: 660px; text: FdvModel.frames-text; color: Theme.text-primary; font-size: 24px; }
+    Lamp { x: 1228px; y: 560px; width: 320px; label: "BIT ERRORS"; lit: FdvModel.frame-error; colour: Theme.accent-bad; }
+    Lamp { x: 1568px; y: 560px; width: 320px; label: FdvModel.speech ? "SPEECH" : FdvModel.speech-text; lit: FdvModel.speech; }
+    // Text channel
+    Text { x: 1228px; y: 640px; text: "Text from the sender"; color: Theme.text-dim; font-size: 20px; }
+    Rectangle {
+        x: 1228px; y: 670px; width: 660px; height: 120px; background: Theme.button-idle; border-radius: 4px;
+        Text {
+            x: 12px; y: 8px; width: parent.width - 24px; height: 70px;
+            text: FdvModel.text-line == "" ? "-" : FdvModel.text-line;
+            color: FdvModel.text-fresh ? Theme.accent-good : Theme.text-dim;
+            font-size: 52px; font-weight: 700; vertical-alignment: center; overflow: elide;
+        }
+        Text { x: 12px; y: 84px; width: parent.width - 24px; height: 30px; text: FdvModel.text-partial; color: Theme.text-dim; font-size: 22px; overflow: elide; }
+    }
+}

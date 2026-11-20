@@ -1,0 +1,371 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# DRAFT (see [block].status below): base address is fixed (docs/ARCHITECTURE.md 4.1), but this
+# is a first cut at the register layout from the section 3.1 prose, not checked against any
+# RTL yet. Whoever builds the link blocks should edit
+# this file (and flip status to "final") once the real register port exists; until then treat
+# every offset and field here as a proposal. Packet memory (receive ring, transmit queue) lives
+# in the separate 0xE802_0000 block per ARCHITECTURE 4.1 and is not covered here.
+
+[block]
+name = "hl2_link"
+base = 0xE801_0000
+size = 0x0001_0000
+status = "draft"
+description = """
+HL2 link control (docs/ARCHITECTURE.md 3.1): our/HL2 addressing, the raw-frame header mirror,
+the safety byte and its change interrupt, receive counters, and TX framer enable/trim. Packet
+memory for the CPU receive ring and transmit queue is the separate block at 0xE802_0000.
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x484C_0001
+description = "Block identifier/version: 'HL' + version 1 (set by the chip top level, rtl/top/hl2_link_regs.v)."
+
+[[register]]
+name = "ctrl"
+offset = 0x004
+description = "Link enable and addressing mode."
+
+[[register.field]]
+name = "rx_enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = classifier and raw-frame parser running."
+
+[[register.field]]
+name = "dhcp_enable"
+bits = "1"
+access = "RW"
+reset = 1
+description = "1 = firmware's minimal DHCP server answers the HL2 (ARCHITECTURE 3.1); 0 = link-local only."
+
+[[register]]
+name = "our_mac_hi"
+offset = 0x008
+access = "RW"
+reset = 0
+description = "Our MAC address, upper 16 bits (in bits [15:0]); used to build TX frame headers in logic."
+
+[[register]]
+name = "our_mac_lo"
+offset = 0x00C
+access = "RW"
+reset = 0
+description = "Our MAC address, lower 32 bits."
+
+[[register]]
+name = "our_ip"
+offset = 0x010
+access = "RW"
+reset = 0x0A63_0001
+description = "Our IPv4 address on the HL2 link. Reset value is 10.99.0.1 (ARCHITECTURE 3.1's default Tang address)."
+
+[[register]]
+name = "hl2_mac_hi"
+offset = 0x014
+access = "RW"
+reset = 0
+description = "HL2's MAC address, upper 16 bits (in bits [15:0]). Firmware writes it from the discovery reply (read-write: nothing in logic learns it); the TX framer addresses raw TX frames to it."
+
+[[register]]
+name = "hl2_mac_lo"
+offset = 0x018
+access = "RW"
+reset = 0
+description = "HL2's MAC address, lower 32 bits, learned from its discovery reply."
+
+[[register]]
+name = "hl2_ip"
+offset = 0x01C
+access = "RW"
+reset = 0
+description = "HL2's IPv4 address, either assigned by our DHCP server (10.99.0.2 by default) or learned from discovery."
+
+[[register]]
+name = "status"
+offset = 0x020
+description = "Link and discovery status, read-only except the change flag."
+
+[[register.field]]
+name = "discovered"
+bits = "0"
+access = "RO"
+reset = 0
+description = "1 = at least one frame has been routed to the CPU receive ring; the HL2's discovery reply is such a frame, which is where the name comes from (the MAC and IP above are valid once the firmware has written them)."
+
+[[register.field]]
+name = "streaming"
+bits = "1"
+access = "RO"
+reset = 0
+description = "1 = raw ADC frames are arriving and passing CRC."
+
+[[register]]
+name = "safety_byte"
+offset = 0x024
+description = "Mirror of the safety byte from the most recent raw-frame header (PROTOCOL 5.4), and its change flag."
+
+[[register.field]]
+name = "value"
+bits = "7:0"
+access = "RO"
+reset = 0
+description = "Raw safety byte. Bit 7 = trip, bit 6 = over-temperature (checked in logic, not just here: ARCHITECTURE 3.1 item 5)."
+
+[[register.field]]
+name = "changed"
+bits = "8"
+access = "W1C"
+reset = 0
+description = "Set whenever `value` changes since the last clear; drives fabric interrupt line 1 (ARCHITECTURE 4.3)."
+
+[[register]]
+name = "rx_seq"
+offset = 0x028
+access = "RO"
+reset = 0
+description = "Sequence number of the most recent committed raw frame (since 2026-10-21; it read 0 before)."
+
+[[register]]
+name = "rx_first_sample_hi"
+offset = 0x02C
+access = "RO"
+reset = 0
+description = "First-sample index of the most recent raw frame, upper 16 bits of the 48-bit index (bits [15:0])."
+
+[[register]]
+name = "rx_first_sample_lo"
+offset = 0x030
+access = "RO"
+reset = 0
+description = "First-sample index of the most recent raw frame, lower 32 bits of the 48-bit index."
+
+[[register]]
+name = "gap_count"
+offset = 0x034
+access = "RO"
+reset = 0
+description = "Running count of gap-fill events (lost or CRC-failed frames, ARCHITECTURE 3.1 item 4). Free-running; firmware differences successive reads."
+
+[[register]]
+name = "crc_error_count"
+offset = 0x038
+access = "RO"
+reset = 0
+description = "Running count of frames dropped for a bad CRC-32. Free-running."
+
+[[register]]
+name = "tx_ctrl"
+offset = 0x03C
+description = "TX sample framer enable."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = framer sends real TX samples; 0 = framer sends zeros regardless of the TX chain (ARCHITECTURE 3.6 item 5, HL2's own interlock stays the final authority)."
+
+[[register]]
+name = "tx_fifo_fill"
+offset = 0x040
+access = "RO"
+reset = 0
+description = "HL2 TX FIFO fill estimate reported back in the v3 header (PROTOCOL 6.3), for the trim loop (ARCHITECTURE 3.6 item 3, target 12,000 of 16,384)."
+
+[[register]]
+name = "tx_trim"
+offset = 0x044
+access = "RO"
+reset = 0
+description = "Signed count of samples the trim loop has added (+) or dropped (-) since the last read, to hold tx_fifo_fill near its target."
+
+# ---- added with the chip top level: counters the receive block already keeps, and the CPU
+# ring write pointer. hl2_ip above is RW: the receive block's raw-frame classifier matches frames by the
+# HL2's IP (cfg_hl2_ip), which nothing in logic learns, so firmware writes it after discovery.
+
+[[register]]
+name = "raw_frame_count"
+offset = 0x048
+access = "RO"
+reset = 0
+description = "Running count of CRC-good raw sample frames (counter cnt_raw_frames). Free-running."
+
+[[register]]
+name = "other_frame_count"
+offset = 0x04C
+access = "RO"
+reset = 0
+description = "Running count of CRC-good frames routed to the CPU receive ring (counter cnt_other_frames). Free-running."
+
+[[register]]
+name = "ring_frames"
+offset = 0x050
+description = "CPU receive ring frame counters (counters cnt_ring_frames and cnt_ring_dropped), free-running."
+
+[[register.field]]
+name = "committed"
+bits = "15:0"
+access = "RO"
+reset = 0
+description = "Frames committed to the ring."
+
+[[register.field]]
+name = "dropped"
+bits = "31:16"
+access = "RO"
+reset = 0
+description = "Frames dropped because the ring was full."
+
+[[register]]
+name = "gap_sample_count"
+offset = 0x054
+access = "RO"
+reset = 0
+description = "Running count of zero samples the gap filler inserted. Free-running."
+
+[[register]]
+name = "resync_count"
+offset = 0x058
+access = "RO"
+reset = 0
+description = "Running count of index jumps too large to fill (resyncs). Free-running."
+
+[[register]]
+name = "ring_wptr"
+offset = 0x05C
+access = "RO"
+reset = 0
+description = "CPU receive ring write pointer, byte offset into the 4 KB ring at 0xE802_0000 (ring_wr_ptr). Each frame is a 2-byte big-endian length followed by the frame bytes."
+
+[[register]]
+name = "sample_index_lo"
+offset = 0x060
+access = "RO"
+reset = 0
+description = "HL2 sample index of the next expected ADC sample (gap filler), low 32 bits. Read lo first: that latches hi."
+
+[[register]]
+name = "sample_index_hi"
+offset = 0x064
+access = "RO"
+reset = 0
+description = "HL2 sample index, high 16 bits in [15:0], as latched by the last sample_index_lo read."
+
+[[register]]
+name = "our_port"
+offset = 0x068
+access = "RW"
+reset = 51000
+description = "Our UDP source port for raw TX frames to the HL2 (tx_sample_framer cfg_my_port)."
+
+[[register]]
+name = "tx_counts"
+offset = 0x06C
+description = "Rate lock: samples inserted and skipped to hold the HL2 TX FIFO fill (free-running, low 16 bits each)."
+
+[[register.field]]
+name = "inserted"
+bits = "15:0"
+access = "RO"
+reset = 0
+description = "Samples inserted (cnt_tx_insert)."
+
+[[register.field]]
+name = "skipped"
+bits = "31:16"
+access = "RO"
+reset = 0
+description = "Samples skipped (cnt_tx_skip)."
+
+# ---- added 2026-10-21 (branch hl2sfp, docs/HL2_SFP.md section 6): loss accounting. The HL2 link runs on transceiver
+# lane 0 (SFP cage 0); every counter here is free-running from the HL2 link's receive reset; 16-bit ones stop at 0xFFFF.
+
+[[register]]
+name = "seq_lost"
+offset = 0x070
+access = "RO"
+reset = 0
+description = "Raw frames missing by the HL2's frame sequence number (every frame lost before the commit: line, module, FCS, code error, length). Owner requirement: 0."
+
+[[register]]
+name = "loss_a"
+offset = 0x074
+description = "Sequence restarts and frames with a code error."
+
+[[register.field]]
+name = "seq_restarts"
+bits = "15:0"
+access = "RO"
+reset = 0
+description = "Times the sequence went back or a frame had flag 4 (the HL2 started again): counting starts over."
+
+[[register.field]]
+name = "code_frames"
+bits = "31:16"
+access = "RO"
+reset = 0
+description = "Frames dropped for a code error of the lane (also counted in crc_error_count)."
+
+[[register]]
+name = "loss_b"
+offset = 0x078
+description = "Length errors and the HL2's own sample loss."
+
+[[register.field]]
+name = "len_errors"
+bits = "15:0"
+access = "RO"
+reset = 0
+description = "Raw frames with a good FCS dropped: sample bytes not 3N/2, N odd, 0 or above 5,968."
+
+[[register.field]]
+name = "hl2_missing"
+bits = "31:16"
+access = "RO"
+reset = 0
+description = "Committed raw frames with flag 5: the HL2 itself lost samples before them (its FIFO overflow)."
+
+[[register]]
+name = "loss_c"
+offset = 0x07C
+description = "Loss behind the commit (receive chain)."
+
+[[register.field]]
+name = "drain_drops"
+bits = "15:0"
+access = "RO"
+reset = 0
+description = "Committed frames not drained: the previous one was still draining."
+
+[[register.field]]
+name = "overruns"
+bits = "31:16"
+access = "RO"
+reset = 0
+description = "Samples written over one not yet drained (ring overrun)."
+
+[[register]]
+name = "loss_d"
+offset = 0x080
+description = "Index FIFO and the HL2's overflow count."
+
+[[register.field]]
+name = "idx_drops"
+bits = "15:0"
+access = "RO"
+reset = 0
+description = "Frame indices lost because the index FIFO was full."
+
+[[register.field]]
+name = "hl2_ovf"
+bits = "31:16"
+access = "RO"
+reset = 0
+description = "The HL2's own FIFO overflow count from the last raw header (PROTOCOL.md 5.2 bytes 16-17)."

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Pins the Rust toolchain for this repo only. rustup installs this
+# toolchain alongside whatever the user's global default is; it does not change that default.
+
+[toolchain]
+channel = "1.93.0"
+components = ["rustfmt", "clippy"]
+targets = ["riscv32imafc-unknown-none-elf"]

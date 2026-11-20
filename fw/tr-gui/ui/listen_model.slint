@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// State of the LISTEN screen (docs/LISTEN.md). Written from `tr_gui::listen::ListenScreenState` after
+// every change; the `request-*` callbacks only report what the operator did. No radio logic
+// here: the firmware decides and writes the new state back.
+
+export struct ListenTick {
+    // pixels from the left edge of the waterfall window
+    x: int,
+    text: string,
+}
+
+export global ListenModel {
+    // the 8 digits of the frequency, 10 MHz first
+    in-out property <[int]> digits: [1, 4, 2, 0, 0, 0, 0, 0];
+    // leading zeros of the display, shown dim
+    in-out property <int> lead-zeros: 0;
+    in-out property <string> freq-text: "14.200.000";
+    // index into LSB USB CW AM SAM FM
+    in-out property <int> mode-index: 1;
+    in-out property <[string]> band-names: ["160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "GEN"];
+    in-out property <int> band-index: 5;
+    in-out property <[string]> filter-names: ["2.4 kHz", "1.8 kHz", "2.8 kHz"];
+    in-out property <int> filter-index: 0;
+    in-out property <[string]> step-names: ["10 Hz", "100 Hz", "1 kHz", "5 kHz", "9 kHz", "10 kHz", "12.5 kHz", "100 kHz", "1 MHz"];
+    in-out property <int> step-index: 1;
+    in-out property <string> step-text: "100 Hz";
+    in-out property <bool> agc-on: true;
+    in-out property <bool> agc-available: true;
+    in-out property <bool> squelch-on: false;
+    in-out property <string> squelch-text: "-100 dBFS";
+    in-out property <bool> squelch-open: true;
+    in-out property <float> squelch-fraction: 0.33;
+    in-out property <int> volume-pct: 50;
+    in-out property <string> volume-text: "50 %";
+    in-out property <float> smeter-fraction: 0;
+    in-out property <string> smeter-text: "-140.0 dBFS";
+    in-out property <[ListenTick]> ticks: [];
+    // pass band of the filter on the waterfall scale, left and right pixel
+    in-out property <int> passband-x0: 634;
+    in-out property <int> passband-x1: 1018;
+    // pixel of the tuned frequency
+    in-out property <int> centre-x: 586;
+    in-out property <string> scale-note: "";
+    in-out property <string> info-text: "";
+    in-out property <string> audio-text: "";
+    in-out property <bool> audio-ok: true;
+    in-out property <string> link-text: "HL2: no link";
+    in-out property <bool> link-ok: false;
+    // waterfall controls: sensitivity (from the automatic setting), contrast (range) and speed
+    in-out property <string> wf-sensitivity-text: "0 dB";
+    in-out property <string> wf-range-text: "60 dB";
+    in-out property <string> wf-speed-text: "7 /s";
+    in-out property <bool> wf-available: true;
+    // the HL2's RX gain, the RF AGC (auto or manual) and one line about the HL2
+    in-out property <string> rf-gain-text: "20 dB";
+    in-out property <bool> rf-agc-auto: false;
+    in-out property <string> hl2-text: "";
+
+    callback request-mode(int);
+    callback request-filter(int);
+    callback request-step(int);
+    callback request-tune-steps(int);
+    // the digit worth 10^place Hz, +1 or -1
+    callback request-tune-digit(int, int);
+    callback request-waterfall-click(int);
+    callback request-band-select(int);
+    callback request-agc-toggle();
+    callback request-squelch-toggle();
+    callback request-squelch-step(int);
+    callback request-volume-step(int);
+    callback request-switch-to-ft8();
+    callback request-switch-to-freedv();
+    // +1: one step up (sensitivity: brighter; contrast: wider range; speed: faster), -1: down
+    callback request-wf-sensitivity-step(int);
+    callback request-wf-sensitivity-auto();
+    callback request-wf-range-step(int);
+    callback request-wf-speed-step(int);
+    // RX gain -1 or +1 dB; the RF AGC between auto and manual
+    callback request-rf-gain-step(int);
+    callback request-rf-agc-toggle();
+}

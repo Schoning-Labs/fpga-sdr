@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "tr-modes"
+version = "0.1.0"
+edition = "2021"
+# The crate's own code is Apache-2.0, but it links the vendored mfsk-core (GPL-3.0) and contains a few
+# files derived from WSJT-X (GPL), so a binary built from it is distributed under the GPL-3.0.
+license = "Apache-2.0"
+description = "FT8/FT4/WSPR and other digital modes"
+
+# The crate is `#![no_std]` (plus `alloc`) by default so that it cross-builds for
+# riscv32imafc-unknown-none-elf. The "std" feature is what a host build turns on (cargo test at the
+# fw/ workspace root, and the `trmodes-decode` PC command line tool).
+#
+# FFT backend: "fft-portable" (default, on for both no_std and std builds) is this crate's own
+# pure-Rust FFT (src/fft.rs: recursive mixed-radix 2/3/5 Cooley-Tukey, with Bluestein as a fallback
+# for any other length, no SIMD, no libc, `libm` for the trig), wired in through mfsk-core's
+# `fft-extern` hook. It is what makes `decode` (RX) available under `no_std` at all, see
+# docs/S5_MODES.md "no_std FFT backend" for its measured recall against the "fft-rustfft" backend
+# and for its timing. The optional "fft-rustfft" feature swaps in mfsk-core's SIMD-accelerated,
+# std-only `rustfft` backend instead (host only, kept for the timing comparison in docs/S5_MODES.md).
+# The two are mutually exclusive in effect: mfsk-core's own `default_planner()` picks "fft-rustfft"
+# over "fft-extern" whenever both are enabled, so building with `--features fft-rustfft` silently
+# falls back to rustfft even though "fft-portable" is still on by default. Pass
+# `--no-default-features --features std,ft8,ft4,wspr,fft-rustfft` to get a clean rustfft-only build.
+[features]
+default = ["std", "fft-portable", "ft8", "ft4", "wspr"]
+std = ["mfsk-core/std"]
+fft-portable = ["mfsk-core/fft-extern"]
+fft-rustfft = ["std", "mfsk-core/fft-rustfft"]
+ft8 = ["mfsk-core/ft8"]
+ft4 = ["mfsk-core/ft4"]
+wspr = ["mfsk-core/wspr"]
+
+[dependencies]
+# default-features = false: no std and no FFT backend is pulled in implicitly, both are added back
+# by the features above.
+mfsk-core = { version = "0.11", default-features = false, features = ["alloc"] }
+# Only for src/fft.rs (Complex32 construction and arithmetic). It is no_std through its own "libm"
+# feature, the same choice mfsk-core makes, because no_std has no f32::sin/cos without libm.
+num-complex = { version = "0.4", default-features = false, features = ["libm"] }
+libm = { version = "0.2", default-features = false }
+
+[[bin]]
+name = "trmodes-decode"
+path = "src/bin/decode_wav.rs"
+required-features = ["std"]
+
+[[bin]]
+name = "sensitivity-sweep"
+path = "src/bin/sensitivity_sweep.rs"
+required-features = ["std"]
+
+[[bin]]
+name = "ft8-frontend"
+path = "src/bin/ft8_frontend.rs"
+required-features = ["std", "ft8"]

@@ -1,0 +1,35 @@
+tr-freedv: a Rust port of the FreeDV 700D and 700E modes
+========================================================
+
+This crate is a translation into Rust of parts of Codec 2, release 1.2.0
+(https://github.com/drowe67/codec2), the reference implementation of FreeDV:
+
+  src/ofdm.c, src/ofdm_mode.c, src/ofdm_internal.h   OFDM modem (David Rowe, Steve Sampson)
+  src/freedv_700.c, src/freedv_api.c                 FreeDV framing and receive logic (David Rowe)
+  src/interldpc.c, src/gp_interleaver.c              LDPC framing, interleaver (David Rowe)
+  src/varicode.c, src/varicode_table.h               text channel code (David Rowe; table: Clint Turner,
+                                                     Peter Martinez, the PSK31 varicode)
+  src/mpdecode_core.c                                LDPC decoder (Matthew C. Valenti, Rohit Iyer
+                                                     Seshadri, David Rowe; from the Iterative
+                                                     Solutions Coded Modulation Library)
+  src/HRA_112_112.c, src/HRA_56_56.c                 LDPC codes (Bill Cowley VK5DSP)
+
+Codec 2 is Copyright (C) 2006-2020 David Rowe and contributors and is licensed
+under the GNU Lesser General Public License version 2.1 (file COPYING.LGPL-2.1
+in this directory). A translation is a modified version of the Library in the
+sense of that licence, so this crate carries the same licence:
+SPDX-License-Identifier: LGPL-2.1-only.
+
+Modified 2026 by Franz Schöning, https://www.schoning.com: translated from C to
+Rust; no heap; only the 700D and 700E voice modes; real-valued receive buffer;
+exact phi function in the LDPC decoder instead of the table; no transmit
+clipper or band-pass filter yet; own sample-rate converter.
+
+Use inside fpga-sdr: the repository is Apache-2.0, but the firmware image is one work and is GPL-3.0. Section 3 of the
+LGPL 2.1 allows any copy of the Library to be distributed under the ordinary GNU
+General Public License, version 2 or any later version, instead. The firmware
+image that contains this crate is distributed under GPL-3.0 on that
+basis. The source of this crate stays under LGPL-2.1-only so that it can be
+given back to the Codec 2 project.
+
+FreeDV is by David Rowe VK5DGR and the FreeDV team. See docs/FREEDV.md.

@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// The UI state surface of the front panel. Every property here is `in-out`: the firmware (or
+// the host screenshot test) writes it from a `tr_gui::PanelState` Rust struct (src/model.rs)
+// after every change, and the components read it to draw. A handful of `request-*` callbacks
+// let controls ask for a change without deciding it themselves. This file holds no radio logic,
+// only the shape of the state and the fact that a click requests a change.
+
+export struct RxSliceInfo {
+    id: int,
+    freq-text: string,
+    mode-text: string,
+    active: bool,
+    audible: bool,
+    in-passband: bool,
+}
+
+export struct Ft8DecodeInfo {
+    utc-text: string,
+    dt-text: string,
+    freq-offset-text: string,
+    snr-text: string,
+    message-text: string,
+}
+
+export global PanelModel {
+    // Frequency display (VFO A/B). Split into a large "main" part (MHz/kHz) and a smaller "sub"
+    // part (the last 3 Hz digits), the way a transceiver's main display groups them.
+    in-out property <string> vfo-a-main-text: "14.074";
+    in-out property <string> vfo-a-sub-text: "000";
+    in-out property <string> vfo-b-main-text: "14.230";
+    in-out property <string> vfo-b-sub-text: "000";
+    in-out property <int> active-vfo: 0; // 0 = A, 1 = B
+
+    // Band buttons: ham bands only. The N2ADR filter groups (docs/ARCHITECTURE.md 8, several
+    // bands sharing one low-pass filter) are a different thing, shown only in the N2ADR
+    // indicator and never here.
+    in-out property <[string]> band-names: ["160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "Gen"];
+    in-out property <int> active-band-index: 5;
+
+    // Mode buttons
+    in-out property <[string]> mode-names: ["LSB", "USB", "CW", "AM", "FM", "DIGI"];
+    in-out property <int> active-mode-index: 1;
+
+    // Filter width
+    in-out property <string> filter-width-text: "2.4 kHz";
+
+    // AGC
+    in-out property <[string]> agc-names: ["Off", "Slow", "Med", "Fast"];
+    in-out property <int> active-agc-index: 2;
+
+    // Noise reduction / noise blanker
+    in-out property <bool> nr-enabled: false;
+    in-out property <int> nr-level: 5;
+    in-out property <bool> nb-enabled: false;
+    in-out property <int> nb-level: 3;
+
+    // RX slices, up to 8 receivers (docs/ARCHITECTURE.md 3.2)
+    in-out property <[RxSliceInfo]> rx-slices: [];
+
+    // TX controls, with a clear inhibit indication (docs/ARCHITECTURE.md 3.6: the HL2's own
+    // interlock is the final authority, so this only reflects its state and never sets it)
+    in-out property <bool> tx-keyed: false;
+    in-out property <bool> tx-inhibited: true;
+    in-out property <string> tx-inhibit-text: "no TX lease";
+
+    // N2ADR filter-board indicator (docs/ARCHITECTURE.md 8)
+    in-out property <string> n2adr-filter-text: "20 m LPF";
+    in-out property <bool> n2adr-ok: true;
+    in-out property <string> n2adr-warning-text: "";
+
+    // S-meter
+    in-out property <float> s-meter-db: -73;
+    in-out property <string> s-meter-text: "S7";
+    in-out property <string> s-meter-dbm-text: "-73 dBm";
+
+    // Digital-mode panel: FT8 decode list
+    in-out property <[Ft8DecodeInfo]> ft8-decodes: [];
+
+    // Menu
+    in-out property <bool> menu-open: false;
+    in-out property <[string]> menu-items: ["Display", "Audio", "Network", "Filters", "About"];
+    in-out property <int> menu-selected-index: -1;
+
+    // Requests from controls up to whatever drives the panel (the firmware). A request does not
+    // change PanelModel itself, only a later `apply_state` call (src/lib.rs) does.
+    callback request-vfo-select(int);
+    callback request-band-select(int);
+    callback request-mode-select(int);
+    callback request-agc-select(int);
+    callback request-nr-toggle();
+    callback request-nb-toggle();
+    callback request-rx-slice-select(int);
+    callback request-tx-toggle();
+    callback request-menu-open();
+    callback request-menu-select(int);
+}

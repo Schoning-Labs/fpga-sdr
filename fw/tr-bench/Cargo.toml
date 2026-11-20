@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# CPU benchmark harness. The kernel-building and measurement logic
+# (src/lib.rs) is board-agnostic, since it depends only on tr-dsp and the `riscv` crate's minstret
+# CSR accessor, both of which build for any riscv32 target, so the same code could in
+# principle run on the real AE350 hardware counters without change. The QEMU
+# entry point (src/bin/dsp_bench.rs) supplies a UART writer and the board-qemu exit path,
+# mirroring fw/tr-app/src/bin/qemu_smoke.rs's board-ae350/board-qemu split (see
+# fw/tr-ae350/src/board.rs). See docs/S2_BENCH.md for how to run this and what the numbers mean.
+
+[package]
+name = "tr-bench"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "CPU benchmark harness: tr-dsp kernels under QEMU with instruction counting"
+
+[dependencies]
+tr-dsp = { path = "../tr-dsp" }
+tr-ae350 = { path = "../tr-ae350", default-features = false }
+riscv = "0.16"
+riscv-rt = { version = "0.18", features = ["single-hart"] }
+libm = "0.2.16"
+# FT8 decode needs `alloc`
+# (mfsk-core and tr-modes are `alloc`-based), and this `no_std` binary has no
+# allocator of its own otherwise, see `src/ft8_bench.rs`'s module doc for
+# why a small off-the-shelf allocator is used and not a hand-rolled one. Both
+# optional, pulled in only by the `bench-ft8` feature below.
+tr-modes = { path = "../tr-modes", default-features = false, features = ["ft8", "fft-portable"], optional = true }
+linked_list_allocator = { version = "0.10", default-features = false, features = ["use_spin"], optional = true }
+
+[features]
+# See fw/tr-ae350/Cargo.toml for what these select; forwarded the same way fw/tr-app does it.
+default = ["board-ae350"]
+board-ae350 = ["tr-ae350/board-ae350"]
+board-qemu = ["tr-ae350/board-qemu"]
+
+# Real FT8 decode measurement (`src/ft8_bench.rs`), against the two
+# WSJT-X sample recordings `tools/fetch_test_audio.sh` fetches into the
+# gitignored `captures/ft8/` (they must be fetched before building with this
+# feature on, because the recordings are embedded via `include_bytes!` at compile
+# time, so a missing file is a build error and not a graceful runtime skip).
+# Off by default and left out of `tools/qemu_s2.sh --smoke` (and therefore
+# `tools/check.sh`) precisely so neither depends on `captures/` existing;
+# `tools/qemu_s2.sh` (no `--smoke`) turns it on automatically when the two
+# files are present. See docs/S5_MODES.md / docs/CPU_BUDGET.md for the
+# measured numbers this produces.
+bench-ft8 = ["dep:tr-modes", "dep:linked_list_allocator"]
+# Stub for a GUI benchmark. Off by default: the harness reports this line as
+# "not yet available" and does not try to link a GUI crate. Once the
+# GUI crate is usable here, turn the feature on and wire the real call into
+# src/lib.rs's `bench_gui` (see the `not(feature = ...)` arm there for exactly
+# what to replace).
+bench-gui = []
+
+# The same pattern fw/tr-app/Cargo.toml uses: it keeps this bin out of the normal
+# default (board-ae350) build entirely, so `cargo build -p tr-bench` with no flags builds only
+# the lib (board-agnostic, cross-checked by tools/check.sh's riscv32imafc build list); this bin
+# only exists for `--no-default-features --features board-qemu`, which tools/qemu_s2.sh runs.
+[[bin]]
+name = "dsp_bench"
+path = "src/bin/dsp_bench.rs"
+required-features = ["board-qemu"]

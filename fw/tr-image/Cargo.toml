@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Shared image format (header + CRC32) for the stage-0 loader (docs/C2_LOADER.md).
+# no_std by default so fw/tr-loader (the firmware side) can parse/validate a header with no
+# allocator; `std` only adds convenience `Vec<u8>` helpers used by the host-side tools
+# (fw/xtask's `image` subcommand, fw/tr-loader-send).
+
+[package]
+name = "tr-image"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "fpga-sdr boot image format: header, CRC32, packing/parsing"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]

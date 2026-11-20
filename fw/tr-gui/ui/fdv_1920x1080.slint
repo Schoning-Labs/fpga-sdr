@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// FreeDV screen as a window of its own, for the host test. The firmware shows
+// `AppScreen1920x1080` (app_1920x1080.slint), which holds this view as well.
+
+import { FdvView } from "fdv_view.slint";
+export { FdvModel, FdvTick } from "fdv_model.slint";
+
+export component FdvScreen1920x1080 inherits Window {
+    width: 1920px;
+    height: 1080px;
+    FdvView { }
+}

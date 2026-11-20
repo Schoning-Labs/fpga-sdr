@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# QEMU-only test fixture for the loader's end-to-end test (docs/C2_LOADER.md, tools/qemu_c2.sh): a tiny
+# bare-metal payload that `cargo xtask image` packs, `tr-loader-send` sends over the emulated
+# UART, and stage-0 (fw/tr-loader) receives, CRC-checks and jumps to. Its only job is to prove
+# that jump landed on real, working code: it prints a known line and shuts QEMU down. It is never
+# shipped and never built for board-ae350, since it is only a test fixture and not a real firmware
+# component, which is why it lives in its own crate and not as a test-only binary in a shipping crate.
+
+[package]
+name = "tr-loader-testfw"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "QEMU-only test payload for the stage-0 loader test"
+build = "build.rs"
+
+[dependencies]
+tr-ae350 = { path = "../tr-ae350", default-features = false, features = ["board-qemu"] }
+riscv-rt = { version = "0.18", features = ["single-hart"] }
+
+[[bin]]
+name = "payload"
+path = "src/bin/payload.rs"

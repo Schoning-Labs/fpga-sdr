@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// TX status. The HL2's own interlock is the final authority on whether transmit is possible
+// (docs/ARCHITECTURE.md 3.6), so this panel only reflects `PanelModel.tx-inhibited` and
+// `tx-inhibit-text`. The inhibited state is drawn in red and the ready state in green, so an
+// operator cannot mistake one for the other. `request-tx-toggle` is the only outgoing request,
+// and nothing here can key the transmitter on its own (docs/DECISIONS.md: no key bit is ever set
+// locally).
+
+import { Theme } from "theme.slint";
+import { PanelModel } from "../model.slint";
+
+export component TxControls inherits Rectangle {
+    in property <bool> compact: false;
+    background: Theme.panel-frame;
+    border-width: 1px;
+    border-color: PanelModel.tx-keyed ? Theme.accent-bad : Theme.panel-frame-active;
+
+    VerticalLayout {
+        padding: compact ? 4px : 8px;
+        spacing: compact ? 3px : 6px;
+
+        Rectangle {
+            background: PanelModel.tx-inhibited ? Theme.accent-bad : Theme.accent-good;
+            border-radius: 3px;
+            min-height: compact ? 18px : 26px;
+            Text {
+                text: PanelModel.tx-inhibited ? "TX INHIBITED: " + PanelModel.tx-inhibit-text : "TX READY";
+                color: #0a0a0a;
+                font-weight: 700;
+                font-size: compact ? 9px : 13px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        Rectangle {
+            background: PanelModel.tx-keyed ? Theme.accent-bad : Theme.button-idle;
+            border-width: 1px;
+            border-color: Theme.panel-frame-active;
+            border-radius: 3px;
+            min-height: compact ? 20px : 32px;
+            Text {
+                text: PanelModel.tx-keyed ? "ON AIR" : "PTT";
+                color: PanelModel.tx-keyed ? #0a0a0a : Theme.text-dim;
+                font-weight: 600;
+                font-size: compact ? 10px : 14px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            TouchArea {
+                clicked => { PanelModel.request-tx-toggle(); }
+            }
+        }
+    }
+}

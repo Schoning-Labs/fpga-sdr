@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Bit-exact Rust model of the receiver bank (rtl/rx/*.v). It runs on a PC only (std) and is not
+# meant for the AE350: it lets a PC stand in for the real FPGA receiver bank (live Hermes-Lite 2
+# stream or capture -> this model -> tr-dsp -> audio, see docs/PLAN.md), and it lets the bit-exact
+# comparison against iverilog run as a plain cargo binary. See docs/R2_RXMODEL.md.
+
+[package]
+name = "tr-rxmodel"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Bit-exact Rust model of the receiver bank (rtl/rx/*.v)"
+
+[[bin]]
+name = "r2_check"
+path = "src/bin/r2_check.rs"
+
+[dependencies]

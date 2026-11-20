@@ -1,0 +1,242 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# Board link page (0xE80B_0000), (rtl/blink/blink_top.v, docs/ARCHITECTURE.md).
+
+[block]
+name = "blink"
+base = 0xE80B_0000
+size = 0x0001_0000
+status = "draft"
+description = """
+Board link on SFP1 (docs/SFP_LINKS.md section 5): the HL2 sample stream to a second board, control
+words for the two CPUs, status and counters, and the switch that feeds the receivers of this board
+from the link. rtl/blink/blink_top.v. All in clk_dsp.
+"""
+
+[[register]]
+name = "id"
+offset = 0x0000
+access = "RO"
+reset = 0x424C0001
+description = "Block identifier: BL + version 1."
+
+[[register]]
+name = "ctrl"
+offset = 0x0004
+description = "Board link settings."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "0 = link logic held in reset, counters cleared."
+
+[[register.field]]
+name = "send_samples"
+bits = "1"
+access = "RW"
+reset = 0
+description = "1 = send the HL2 sample stream of this board over the link (board 1)."
+
+[[register.field]]
+name = "rx_from_link"
+bits = "2"
+access = "RW"
+reset = 0
+description = "1 = receiver bank, zoom, spectrum and FT8 take the sample stream of the link instead of the HL2 link (board 2). Switch with the receivers disabled."
+
+[[register]]
+name = "status"
+offset = 0x0008
+description = "Board link state."
+
+[[register.field]]
+name = "aligned"
+bits = "0"
+access = "RO"
+reset = 0
+description = "The comma aligner of lane 1 is locked."
+
+[[register.field]]
+name = "link_up"
+bits = "1"
+access = "RO"
+reset = 0
+description = "Link up: aligned and four good frames in a row."
+
+[[register.field]]
+name = "remote_link_up"
+bits = "2"
+access = "RO"
+reset = 0
+description = "The other board reports its receiver has the link up."
+
+[[register.field]]
+name = "remote_sending"
+bits = "3"
+access = "RO"
+reset = 0
+description = "The other board is sending samples."
+
+[[register.field]]
+name = "remote_ctl_full"
+bits = "4"
+access = "RO"
+reset = 0
+description = "The control-word receive FIFO of the other board is full."
+
+[[register.field]]
+name = "ctl_tx_full"
+bits = "5"
+access = "RO"
+reset = 0
+description = "Our control-word send FIFO is full: do not write ctl_tx."
+
+[[register.field]]
+name = "ctl_rx_avail"
+bits = "6"
+access = "RO"
+reset = 0
+description = "A received control word waits in ctl_rx."
+
+[[register]]
+name = "ctl_tx"
+offset = 0x0010
+access = "RW"
+reset = 0x0
+description = "Write: queue a 32-bit control word for the CPU of the other board. Reads 0."
+
+[[register]]
+name = "ctl_rx"
+offset = 0x0014
+access = "RO"
+reset = 0x0
+description = "The waiting control word; reading it takes it (status.ctl_rx_avail falls until the next one is ready)."
+
+[[register]]
+name = "rx_frames"
+offset = 0x0020
+access = "RO"
+reset = 0x0
+description = "Good sample frames received (16 bits, wraps)."
+
+[[register]]
+name = "rx_bad"
+offset = 0x0024
+access = "RO"
+reset = 0x0
+description = "Bad frames of any kind: code error, length, CRC (16 bits)."
+
+[[register]]
+name = "rx_seq_jumps"
+offset = 0x0028
+access = "RO"
+reset = 0x0
+description = "Sample frames whose counter did not follow the one before (16 bits)."
+
+[[register]]
+name = "align_losses"
+offset = 0x002C
+access = "RO"
+reset = 0x0
+description = "Times the aligner of lane 1 lost its lock (16 bits)."
+
+[[register]]
+name = "link_ups"
+offset = 0x0030
+access = "RO"
+reset = 0x0
+description = "Times the link came up (16 bits)."
+
+[[register]]
+name = "tx_samples"
+offset = 0x0034
+access = "RO"
+reset = 0x0
+description = "Samples queued for the link (32 bits)."
+
+[[register]]
+name = "rx_samples"
+offset = 0x0038
+access = "RO"
+reset = 0x0
+description = "Real (not fill) samples delivered from the link (32 bits)."
+
+[[register]]
+name = "tx_counts"
+offset = 0x003C
+access = "RO"
+reset = 0x0
+description = "Bits 15:0 sample frames sent, 31:16 control words sent."
+
+[[register]]
+name = "ctl_counts"
+offset = 0x0040
+access = "RO"
+reset = 0x0
+description = "Bits 15:0 control words received, 31:16 control words missing by their sequence numbers."
+
+[[register]]
+name = "ctl_dropped"
+offset = 0x0044
+access = "RO"
+reset = 0x0
+description = "Received control words dropped because ctl_rx was not read (16 bits)."
+
+[[register]]
+name = "remote_bad"
+offset = 0x0048
+access = "RO"
+reset = 0x0
+description = "The rx_bad count of the other board, from its status word."
+
+[[register]]
+name = "gap_events"
+offset = 0x004C
+access = "RO"
+reset = 0x0
+description = "Gaps zero-filled in the stream of the link (source gaps and lost frames)."
+
+[[register]]
+name = "gap_samples"
+offset = 0x0050
+access = "RO"
+reset = 0x0
+description = "Samples zero-filled."
+
+[[register]]
+name = "resyncs"
+offset = 0x0054
+access = "RO"
+reset = 0x0
+description = "Index jumps too large to fill (over 65,536 samples)."
+
+[[register]]
+name = "tx_overflows"
+offset = 0x0058
+access = "RO"
+reset = 0x0
+description = "Times the send FIFO was full and samples were left out (the receiver fills them)."
+
+[[register]]
+name = "rx_overruns"
+offset = 0x005C
+access = "RO"
+reset = 0x0
+description = "Frames dropped at the receiver for lack of room (16 bits)."
+
+[[register]]
+name = "sample_index_lo"
+offset = 0x0060
+access = "RO"
+reset = 0x0
+description = "Index of the next sample of the stream of the link, bits 31:0. Reading it latches the upper 16 bits."
+
+[[register]]
+name = "sample_index_hi"
+offset = 0x0064
+access = "RO"
+reset = 0x0
+description = "Bits 47:32, latched by the read of sample_index_lo."

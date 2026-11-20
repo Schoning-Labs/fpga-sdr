@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// State of the FreeDV screen (docs/FREEDV.md section 9). Written from `tr_gui::fdv::FdvScreenState`
+// after every change; the `request-*` callbacks only report what the operator did. No radio
+// logic here: the firmware decides and writes the new state back.
+
+export struct FdvTick {
+    // pixels from the left edge of the waterfall window
+    x: int,
+    text: string,
+}
+
+export global FdvModel {
+    in-out property <[string]> band-names: ["80", "40", "20", "17", "15", "10"];
+    in-out property <int> band-index: 2;
+    in-out property <string> dial-text: "14.236.000";
+    in-out property <string> sideband-text: "USB";
+    // true = 700D, false = 700E
+    in-out property <bool> mode-d: true;
+    in-out property <string> mode-text: "700D";
+
+    // 0 = searching, 1 = trial sync, 2 = locked
+    in-out property <int> sync-level: 0;
+    in-out property <string> sync-text: "SEARCHING";
+    in-out property <string> snr-text: "-5.0 dB";
+    // 0..1 over -5 to +20 dB
+    in-out property <float> snr-fraction: 0;
+    in-out property <string> foff-text: "+0.0 Hz";
+    // -1..1 over -100 to +100 Hz
+    in-out property <float> foff-fraction: 0;
+    in-out property <string> uw-text: "unique word: -";
+    in-out property <string> frames-text: "frames: 0";
+    // the last frame had bit errors the error correction could not remove
+    in-out property <bool> frame-error: false;
+    in-out property <bool> speech: false;
+    in-out property <string> speech-text: "no speech";
+
+    in-out property <bool> squelch-on: false;
+    in-out property <string> squelch-text: "squelch off";
+
+    in-out property <string> text-line: "";
+    in-out property <string> text-partial: "";
+    // the modem is in sync, so the text is current
+    in-out property <bool> text-fresh: false;
+
+    in-out property <string> audio-text: "";
+    in-out property <bool> audio-ok: true;
+    in-out property <string> link-text: "HL2: no link";
+    in-out property <bool> link-ok: false;
+
+    in-out property <string> scale-note: "";
+    in-out property <[FdvTick]> ticks: [];
+    // where the sender's signal center is on the scale (pixels), and where 1,500 Hz nominal is
+    in-out property <int> signal-x: 586;
+    in-out property <int> nominal-x: 586;
+    in-out property <bool> signal-visible: false;
+
+    callback request-band-select(int);
+    callback request-mode(bool);
+    callback request-squelch-toggle();
+    callback request-squelch-step(int);
+    callback request-tune(int);
+    callback request-switch-to-ft8();
+    callback request-switch-to-listen();
+}

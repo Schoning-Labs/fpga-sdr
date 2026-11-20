@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "tr-ae350"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "AE350 start-up, traps, PLIC, timer, UART and cache operations"
+build = "build.rs"
+
+[dependencies]
+riscv = "0.16"
+riscv-rt = { version = "0.18", features = ["single-hart"] }
+
+[features]
+# Exactly one of these must be selected (enforced in src/board.rs with a compile_error!).
+# board-ae350: the real Tang Mega 138K Pro dock, addresses from docs/BOARD.md / MUG1029 table 3-1.
+# board-qemu: `qemu-system-riscv32 -M virt`, addresses from QEMU's own hw/riscv/virt.c (see
+# docs/C1_AE350.md). Only the target-independent parts of this crate (UART framing, PLIC
+# claim/complete, machine-timer compare, FPU enable) are exercised this way; CCTL cache
+# operations are AE350-only (QEMU's generic riscv32 CPU has none of the Andes custom CSRs) and
+# compiled out under board-qemu.
+default = ["board-ae350"]
+board-ae350 = []
+board-qemu = []

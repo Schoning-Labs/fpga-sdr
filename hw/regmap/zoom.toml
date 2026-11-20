@@ -1,0 +1,149 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# Final since the zoom receiver is in the chip (docs/ZOOM_IN_CHIP.md). One page, two owners of its
+# registers: rtl/zoom/zoom_frontend.v (id, phase_inc, ctrl.enable, ctrl.span_shift: the zoom DDC and
+# FFT, docs/F3_ZOOM.md) and the zoom context of rtl/spectrum/spectrum_pipeline.v (ctrl bits 4 and 5 and
+# the backend_* registers: column reduction, averaging, dB, waterfall bytes, docs/F2_SPECTRUM.md).
+# The layout mirrors hw/regmap/spectrum.toml so firmware treats both spectra the same way.
+# The zoom waterfall ring is in the video block (wf_zoom_ring_base, wf_zoom_write_line).
+
+[block]
+name = "zoom"
+base = 0xE806_0000
+size = 0x0001_0000
+status = "final"
+description = """
+Zoom DDC and zoom FFT (docs/ARCHITECTURE.md 3.4, docs/F3_ZOOM.md): tunes a zoom centre and a span
+(3 kHz to 3.072 MHz, powers of two), decimates, windows, and runs a 4,096-point complex FFT over
+rtl/zoom/zoom_spectrum.v. Also the zoom backend: column reduction, K-frame averaging, dB
+conversion and waterfall colour mapping over that FFT's output, sharing its arithmetic (log-domain
+K-average, docs/ARCHITECTURE.md 3.14 change C6a) with the full-band spectrum's own walk engine.
+Output (line values, waterfall bytes) is not in this register block; it is a fabric stream/port,
+consumed the same way full-band spectrum output is (see the spectrum block).
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x5A4D_0002
+description = "Block identifier/version: 'ZM' + version 2 (version 2: narrow_shift, narrow_gain, backend_ft8_columns; one line buffer). Reads 0 in a chip built without the zoom receiver."
+
+[[register]]
+name = "phase_inc"
+offset = 0x004
+description = "Zoom-centre NCO phase increment: round(f_Hz / 76.8e6 * 2^32), signed two's complement, relative to the HL2 ADC clock (0.018 Hz steps). Same convention as rx_bank's phase_inc."
+
+[[register.field]]
+name = "value"
+bits = "31:0"
+access = "RW"
+reset = 0
+description = "Signed 32-bit phase increment."
+
+[[register]]
+name = "ctrl"
+offset = 0x008
+description = "Zoom DDC/FFT enable and span selection."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = zoom DDC running and feeding the zoom FFT. 0 holds the DDC in reset: clear it, change span_shift, set it again."
+
+[[register.field]]
+name = "span_shift"
+bits = "3:1"
+access = "RW"
+reset = 6
+description = "Span = 3.072 MHz >> span_shift: 0 = 3.072 MHz, 1 = 1.536 MHz, 2 = 768 kHz, 3 = 384 kHz, 4 = 192 kHz, 5 = 96 kHz, 6 = 48 kHz (reset default). Narrower spans: 6 here and narrow_shift."
+
+[[register.field]]
+name = "backend_column_mode"
+bits = "4"
+access = "RW"
+reset = 0
+description = "Zoom backend: 0 = max per column (keeps narrow carriers visible), 1 = mean per column (noise floor), same meaning as the full-band spectrum's ctrl.column_mode."
+
+[[register.field]]
+name = "backend_peak_hold"
+bits = "5"
+access = "RW"
+reset = 0
+description = "Zoom backend: 1 = averaging BSRAM holds the peak over K transforms instead of the mean."
+
+[[register.field]]
+name = "narrow_shift"
+bits = "8:6"
+access = "RW"
+reset = 0
+description = "Narrow spans (rtl/zoom/zoom_cic_narrow.v): with span_shift = 6, span = 48 kHz >> narrow_shift: 1 = 24 kHz, 2 = 12 kHz, 3 = 6 kHz, 4 = 3 kHz (5 to 7: 4). Ignored (0) unless span_shift = 6. Change only with enable = 0."
+
+[[register.field]]
+name = "narrow_gain"
+bits = "10:9"
+access = "RW"
+reset = 0
+description = "Gain of the narrow spans' extra decimation stage, 4^narrow_gain: 0 = 0 dB, 1 = 12.04 dB, 2 = 24.08 dB, 3 = 36.12 dB, saturating. Lifts the band noise of a few kHz over the rounding of the 16-bit samples and of the power words behind it. No effect with narrow_shift = 0."
+
+[[register.field]]
+name = "backend_ft8_columns"
+bits = "11"
+access = "RW"
+reset = 0
+description = "Zoom backend column scale: 0 = the 3,277 displayed bins across the 1,920 columns (column = span / 1,920). 1 = 0.71533 columns per bin, starting at the low edge of the span: at the 6 kHz span (narrow_shift = 3) one column is 2.5597 Hz, so 1,172 columns are 3,000 Hz (the FT8 screen's scale); bins beyond column 1,919 are not shown."
+
+[[register]]
+name = "backend_averaging_k"
+offset = 0x00C
+access = "RW"
+reset = 32
+description = "Zoom backend: zoom FFT frames averaged per output line. Reset default 32 is a placeholder (the zoom FFT's own frame rate varies with span_shift, unlike the full-band spectrum's fixed 4,687.5 transforms/s); firmware sets this once the target line rate is known."
+
+[[register]]
+name = "backend_level"
+offset = 0x010
+description = "Zoom backend: firmware-set offset and gain applied before the 8-bit waterfall colour index, same formula as the full-band spectrum's own level register."
+
+[[register.field]]
+name = "offset_db64"
+bits = "15:0"
+access = "RW"
+reset = 0
+description = "Signed dB offset, 1/64 dB steps (matches the 16-bit dB line format)."
+
+[[register.field]]
+name = "gain_q8"
+bits = "31:16"
+access = "RW"
+reset = 0x0100
+description = "Unsigned gain, Q8.8 fixed point (0x0100 = 1.0)."
+
+[[register]]
+name = "backend_line_count"
+offset = 0x014
+access = "RO"
+reset = 0
+description = "Zoom backend: free-running count of zoom spectrum lines produced."
+
+[[register]]
+name = "backend_line_status"
+offset = 0x018
+description = "Zoom backend: line status. There is one zoom line buffer since id version 2 (the compositor keeps its own copy of the line)."
+
+[[register.field]]
+name = "ready_buffer"
+bits = "0"
+access = "RO"
+reset = 0
+description = "Always 0 (was: index of the buffer to read, when there were two)."
+
+[[register.field]]
+name = "line_done"
+bits = "1"
+access = "W1C"
+reset = 0
+description = "Set on every completed zoom line; drives its own fabric interrupt line (firmware-side use only)."

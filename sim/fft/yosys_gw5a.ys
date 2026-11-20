@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Resource estimate for the 16k full-band FFT with yosys' experimental Gowin GW5A flow
+# (synthesis only, no place-and-route; Gowin EDA Standard gives the real numbers).
+# yosys does not map multipliers to GW5A DSP blocks, so fft_mul is kept as a black box: each
+# fft_mul instance in the statistics is one 27x18 DSP multiplier. Run from the repository root:
+#   yosys -s sim/fft/yosys_gw5a.ys | tail -40      (about 4 minutes)
+read_verilog -lib rtl/fft/fft_mul.v
+read_verilog rtl/fft/fft_delay.v rtl/fft/fft_bf.v rtl/fft/fft_twmul.v rtl/fft/fft_r22sdf.v
+chparam -set LOG_N 14 -set IW 15 -set REAL_IN 1 fft_r22sdf
+synth_gowin -family gw5a -top fft_r22sdf -noiopads
+stat

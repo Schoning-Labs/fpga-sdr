@@ -1,0 +1,549 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+# DRAFT (see [block].status): the layout the R4 RTL (rtl/rx_backend/rx_backend.v) decodes, via the
+# generated hw/regmap/generated/rx_backend_regs.vh. Draft until the firmware driver (PLAN S18) has
+# used it. Fixed-point meaning of every field: docs/R4_BACKEND.md section 3; register overview:
+# section 8 there.
+#
+# Layout: global registers at 0x000-0x0FF, per-receiver slots of 0x80 bytes at 0x100 + rx * 0x80
+# (receivers 0-7), coefficient window at 0x8000 (1,024 taps x {re, im}, into the bank chosen by
+# coef_sel).
+
+[block]
+name = "rx_backend"
+base = 0xE80C_0000
+size = 0x0001_0000
+status = "draft"
+description = """
+Receiver back end (docs/ARCHITECTURE.md 3.10, docs/R4_BACKEND.md): per receiver noise blanker,
+half-band decimation to 24 ksps, 1,024-tap complex channel filter (coefficient bank pool, 6 banks
+per filter unit), CORDIC demodulator (SSB/CW, AM, SAM, FM, IQ), log-domain AGC, S-meter, squelch,
+12 or 24 ksps output with HL2 sample-index stamps.
+"""
+
+[[register]]
+name = "id"
+offset = 0x000
+access = "RO"
+reset = 0x5242_0001
+description = "Block identifier 'RB' and version 1."
+
+[[register]]
+name = "status"
+offset = 0x004
+description = "Sticky error flags; each set bit means a sample was lost (should never happen: the engines are sized for 8 receivers at 384 ksps with 1,024 taps)."
+
+[[register.field]]
+name = "ovf_front"
+bits = "0"
+access = "W1C"
+reset = 0
+description = "Input FIFO (blanker to decimator) overflowed."
+
+[[register.field]]
+name = "ovf_decim"
+bits = "1"
+access = "W1C"
+reset = 0
+description = "A channel-filter input FIFO overflowed."
+
+[[register.field]]
+name = "ovf_filter"
+bits = "2"
+access = "W1C"
+reset = 0
+description = "The demodulator input FIFO overflowed."
+
+[[register.field]]
+name = "ovf_ring"
+bits = "3"
+access = "W1C"
+reset = 0
+description = "The ring writer's queue overflowed (the DDR3 write lane was blocked for too long)."
+
+[[register]]
+name = "irq_status"
+offset = 0x008
+description = "Output block ready, one bit per receiver (interrupt line 10 = OR of irq_status & irq_enable)."
+
+[[register.field]]
+name = "block"
+bits = "7:0"
+access = "W1C"
+reset = 0
+description = "Set when the receiver's ring received a complete block; write 1 to clear."
+
+[[register]]
+name = "irq_enable"
+offset = 0x00C
+description = "Interrupt enable per receiver."
+
+[[register.field]]
+name = "block"
+bits = "7:0"
+access = "RW"
+reset = 0
+description = "1 = this receiver's block-ready bit drives interrupt line 10."
+
+[[register]]
+name = "coef_sel"
+offset = 0x010
+description = "Which coefficient bank the coefficient window writes."
+
+[[register.field]]
+name = "unit"
+bits = "0"
+access = "RW"
+reset = 0
+description = "Filter unit: 0 serves receivers 0-3, 1 serves receivers 4-7."
+
+[[register.field]]
+name = "bank"
+bits = "3:1"
+access = "RW"
+reset = 0
+description = "Bank 0-5 of that unit. Never write a bank a receiver of that unit is using (bank_cur)."
+
+[[register]]
+name = "bank_cfg"
+offset = 0x040
+count = 12
+stride = 0x004
+description = "Per coefficient bank (index = unit * 6 + bank): tap count and scale exponent. Write before pointing a receiver at the bank."
+
+[[register.field]]
+name = "ntaps"
+bits = "10:0"
+access = "RW"
+reset = 1
+description = "Taps used, 1-1,024."
+
+[[register.field]]
+name = "exp"
+bits = "15:12"
+access = "RW"
+reset = 0
+description = "Coefficient value = c * 2^-(30 + exp)."
+
+[[register]]
+name = "ctrl"
+offset = 0x100
+count = 8
+stride = 0x080
+description = "Per receiver: enable, mode, rates, switches, coefficient bank. Change mode and rates only while disabled; bank_sel may change at any time (takes effect at the next 24 ksps sample)."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = running. A 0-to-1 edge restarts every stage from zero state and relatches the stamp base."
+
+[[register.field]]
+name = "mode"
+bits = "3:1"
+access = "RW"
+reset = 0
+description = "0 SSB/CW/data (real part), 1 AM, 2 synchronous AM, 3 FM, 4 IQ."
+
+[[register.field]]
+name = "out24"
+bits = "4"
+access = "RW"
+reset = 0
+description = "0 = 12 ksps output (audio half-band on), 1 = 24 ksps."
+
+[[register.field]]
+name = "in_rate"
+bits = "6:5"
+access = "RW"
+reset = 0
+description = "Must equal the bank's rate_sel for this receiver: 0..3 = 48/96/192/384 ksps."
+
+[[register.field]]
+name = "in_shift"
+bits = "9:7"
+access = "RW"
+reset = 6
+description = "Input left shift before everything else (saturating). 6 for the current bank."
+
+[[register.field]]
+name = "nb_en"
+bits = "10"
+access = "RW"
+reset = 0
+description = "Noise blanker on."
+
+[[register.field]]
+name = "agc_en"
+bits = "11"
+access = "RW"
+reset = 1
+description = "AGC on; 0 = fixed gain agc_manual (FM always uses agc_manual)."
+
+[[register.field]]
+name = "sq_en"
+bits = "12"
+access = "RW"
+reset = 0
+description = "Squelch on."
+
+[[register.field]]
+name = "bank_sel"
+bits = "15:13"
+access = "RW"
+reset = 0
+description = "Coefficient bank 0-5 of this receiver's filter unit."
+
+[[register]]
+name = "nb"
+offset = 0x104
+count = 8
+stride = 0x080
+description = "Noise blanker threshold and floor time constants."
+
+[[register.field]]
+name = "thr"
+bits = "7:0"
+access = "RW"
+reset = 96
+description = "Trigger when magnitude > floor * thr / 16 (U4.4)."
+
+[[register.field]]
+name = "k_down"
+bits = "12:8"
+access = "RW"
+reset = 9
+description = "Floor time constant 2^k_down samples while the magnitude is below the floor."
+
+[[register.field]]
+name = "k_up"
+bits = "20:16"
+access = "RW"
+reset = 13
+description = "Floor time constant 2^k_up samples while the magnitude is above the floor."
+
+[[register]]
+name = "nb_hold"
+offset = 0x108
+count = 8
+stride = 0x080
+description = "Noise blanker hold length."
+
+[[register.field]]
+name = "samples"
+bits = "15:0"
+access = "RW"
+reset = 38
+description = "Input samples replaced by the last good one after a trigger."
+
+[[register]]
+name = "agc_attack"
+offset = 0x10C
+count = 8
+stride = 0x080
+description = "AGC attack coefficient alpha = a * 2^-(17 + s) (tr_dsp::backend::Alpha::from_time_constant)."
+
+[[register.field]]
+name = "a"
+bits = "16:0"
+access = "RW"
+reset = 0x151CD
+description = "Mantissa, 1-131,071. Reset: 2 ms at 24 ksps."
+
+[[register.field]]
+name = "s"
+bits = "23:20"
+access = "RW"
+reset = 5
+description = "Exponent, 0-15."
+
+[[register]]
+name = "agc_decay"
+offset = 0x110
+count = 8
+stride = 0x080
+description = "AGC decay coefficient alpha = a * 2^-(17 + s)."
+
+[[register.field]]
+name = "a"
+bits = "16:0"
+access = "RW"
+reset = 0x15D7F
+description = "Mantissa, 1-131,071. Reset: 250 ms at 24 ksps."
+
+[[register.field]]
+name = "s"
+bits = "23:20"
+access = "RW"
+reset = 12
+description = "Exponent, 0-15."
+
+[[register]]
+name = "agc_hang"
+offset = 0x114
+count = 8
+stride = 0x080
+description = "AGC hang time."
+
+[[register.field]]
+name = "samples"
+bits = "15:0"
+access = "RW"
+reset = 2400
+description = "24 ksps samples the gain holds after the last attack sample."
+
+[[register]]
+name = "agc_ref"
+offset = 0x118
+count = 8
+stride = 0x080
+description = "AGC reference: log2 of the target envelope on the 24-bit scale, U5.12 (21.0 = -12 dB of the 16-bit output)."
+
+[[register.field]]
+name = "level"
+bits = "16:0"
+access = "RW"
+reset = 0x15000
+description = "U5.12."
+
+[[register]]
+name = "agc_gmax"
+offset = 0x11C
+count = 8
+stride = 0x080
+description = "Largest AGC gain, log2 S7.12."
+
+[[register.field]]
+name = "gain"
+bits = "19:0"
+access = "RW"
+reset = 0x14000
+description = "S7.12 (20.0 = +120 dB)."
+
+[[register]]
+name = "agc_gmin"
+offset = 0x120
+count = 8
+stride = 0x080
+description = "Smallest AGC gain, log2 S7.12."
+
+[[register.field]]
+name = "gain"
+bits = "19:0"
+access = "RW"
+reset = 0xF8000
+description = "S7.12 (-8.0 = -48 dB)."
+
+[[register]]
+name = "agc_manual"
+offset = 0x124
+count = 8
+stride = 0x080
+description = "Fixed gain used with agc_en = 0 and in FM, log2 S7.12."
+
+[[register.field]]
+name = "gain"
+bits = "19:0"
+access = "RW"
+reset = 0
+description = "S7.12."
+
+[[register]]
+name = "loops"
+offset = 0x128
+count = 8
+stride = 0x080
+description = "Smoothing and loop shifts."
+
+[[register.field]]
+name = "k_sm"
+bits = "3:0"
+access = "RW"
+reset = 7
+description = "S-meter smoothing, 2^k_sm samples at 24 ksps."
+
+[[register.field]]
+name = "k_dc"
+bits = "7:4"
+access = "RW"
+reset = 10
+description = "AM/SAM carrier removal, 2^k_dc samples."
+
+[[register.field]]
+name = "sam_kp"
+bits = "12:8"
+access = "RW"
+reset = 7
+description = "SAM PLL proportional shift."
+
+[[register.field]]
+name = "sam_ki"
+bits = "20:16"
+access = "RW"
+reset = 15
+description = "SAM PLL integral shift."
+
+[[register]]
+name = "fm_deemph"
+offset = 0x12C
+count = 8
+stride = 0x080
+description = "FM de-emphasis one-pole coefficient."
+
+[[register.field]]
+name = "alpha"
+bits = "16:0"
+access = "RW"
+reset = 0
+description = "U0.17, round(2^17 * (1 - exp(-1 / (tau * 24000)))); 0 = off. 50 us: 0x1217C, 75 us: 0xDA3D."
+
+[[register]]
+name = "squelch"
+offset = 0x130
+count = 8
+stride = 0x080
+description = "Squelch levels on the S-meter scale (1/64 dB, signed)."
+
+[[register.field]]
+name = "open"
+bits = "15:0"
+access = "RW"
+reset = 0xE700
+description = "Opens above this level (-100 dB)."
+
+[[register.field]]
+name = "close"
+bits = "31:16"
+access = "RW"
+reset = 0xE600
+description = "Closes below this level (-104 dB)."
+
+[[register]]
+name = "rx_status"
+offset = 0x134
+count = 8
+stride = 0x080
+description = "S-meter and state."
+
+[[register.field]]
+name = "smeter"
+bits = "15:0"
+access = "RO"
+reset = 0
+description = "Level in 1/64 dB relative to an envelope of 2^23 (signed)."
+
+[[register.field]]
+name = "sq_open"
+bits = "16"
+access = "RO"
+reset = 0
+description = "1 = squelch open."
+
+[[register.field]]
+name = "bank_cur"
+bits = "19:17"
+access = "RO"
+reset = 0
+description = "Bank the channel filter used for its last sample."
+
+[[register]]
+name = "agc_gain"
+offset = 0x138
+count = 8
+stride = 0x080
+description = "Gain applied to the last sample, log2 S.10 (signed 18 bits, sign-extended)."
+access = "RO"
+reset = 0
+
+[[register]]
+name = "blanked"
+offset = 0x13C
+count = 8
+stride = 0x080
+description = "Input samples the blanker replaced since enable (wraps)."
+access = "RO"
+reset = 0
+
+[[register]]
+name = "stamp_base_lo"
+offset = 0x140
+count = 8
+stride = 0x080
+description = "HL2 index latched when the first bank sample after enable arrived, bits 31:0."
+access = "RO"
+reset = 0
+
+[[register]]
+name = "stamp_base_hi"
+offset = 0x144
+count = 8
+stride = 0x080
+description = "Same, bits 47:32 in 15:0."
+access = "RO"
+reset = 0
+
+[[register]]
+name = "out_count"
+offset = 0x148
+count = 8
+stride = 0x080
+description = "Output samples produced since enable (wraps)."
+access = "RO"
+reset = 0
+
+[[register]]
+name = "ring_base"
+offset = 0x150
+count = 8
+stride = 0x080
+description = "Output ring in DDR3: address of slot 0, in 64-bit lane words."
+access = "RW"
+reset = 0
+
+[[register]]
+name = "ring_slots"
+offset = 0x154
+count = 8
+stride = 0x080
+description = "Output ring size in blocks (slots), a power of two (log2 in bits 3:0)."
+
+[[register.field]]
+name = "log2"
+bits = "3:0"
+access = "RW"
+reset = 4
+description = "Ring holds 2^log2 blocks."
+
+[[register]]
+name = "ring_ctrl"
+offset = 0x158
+count = 8
+stride = 0x080
+description = "Output ring writer."
+
+[[register.field]]
+name = "enable"
+bits = "0"
+access = "RW"
+reset = 0
+description = "1 = write this receiver's blocks to its ring."
+
+[[register]]
+name = "ring_wptr"
+offset = 0x15C
+count = 8
+stride = 0x080
+description = "Blocks completely written to the ring since ring_ctrl.enable was set (the slot index is this modulo the ring size). A block is counted only after its header is written."
+access = "RO"
+reset = 0
+
+[[register]]
+name = "coef"
+offset = 0x8000
+count = 2048
+stride = 0x004
+description = "Coefficient window into the bank chosen by coef_sel: index 2n = tap n real part, 2n+1 = imaginary part, signed 32 bits. Write-only (reads return 0)."
+access = "RW"
+reset = 0

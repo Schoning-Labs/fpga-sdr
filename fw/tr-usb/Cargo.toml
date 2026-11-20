@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# USB audio device (docs/USB_AUDIO.md): the single source of the USB descriptors. The RTL's descriptor
+# ROM rtl/usb/usb_desc_rom.hex and rtl/usb/usb_desc_params.vh are generated from this crate and
+# checked by its tests. no_std, host-testable. The register driver is fw/tr-fabric/src/usb.rs.
+
+[package]
+name = "tr-usb"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "USB descriptors of the USB audio device, source of the RTL descriptor ROM (docs/USB_AUDIO.md)"
+
+[dependencies]

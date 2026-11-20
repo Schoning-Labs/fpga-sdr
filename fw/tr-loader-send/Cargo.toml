@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# PC-side sender for the stage-0 UART loader (docs/C2_LOADER.md "Protocol"). It uses `std` and runs
+# on the PC: it sends the handshake, a packed image (from `cargo xtask image`) and the run/flash
+# command byte, over either a real serial port (`--serial`, real hardware) or a raw TCP socket
+# (`--tcp`, QEMU's `-chardev socket`, see tools/qemu_c2.sh), and relays whatever the loader (and,
+# once it jumps, the payload) prints back.
+
+[package]
+name = "tr-loader-send"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "PC-side sender for the stage-0 UART loader"
+
+[dependencies]
+tr-image = { path = "../tr-image" }
+# Cross-platform serial port access for --serial (real hardware); --tcp (QEMU) uses only
+# std::net. The serial crate is a pure Rust wrapper over each OS's native serial API (Win32 on
+# Windows, termios on Unix), so it is not a C library dependency of the kind docs/DECISIONS.md rules
+# out (no WDSP or GTK style C toolkit), and it is the same kind of OS-API FFI that std::net itself uses.
+serialport = "4"

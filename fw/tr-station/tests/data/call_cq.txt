@@ -1,0 +1,8 @@
+# Hand-written decode list in WSJT-X ALL.TXT layout (not a recording): K1XYZ calls CQ in the
+# 00/30 slots, W9XYZ answers, one of W9XYZ's transmissions is not decoded (18:40:45).
+261012_184015    14.074 Rx FT8    -15  0.2  950 K1XYZ W9XYZ EN37
+261012_184015    14.074 Rx FT8     -3  0.1 2100 K1XYZ JA1XYZ PM95
+261012_184045    14.074 Rx FT8    -20 -0.3 2622 CQ VK2XYZ QF56
+261012_184115    14.074 Rx FT8    -14  0.2  950 K1XYZ W9XYZ R-09
+261012_184145    14.074 Rx FT8    -13  0.2  950 K1XYZ W9XYZ 73
+261012_184215    14.074 Rx FT8      1  0.1 1988 JA1XYZ K1ABC 73

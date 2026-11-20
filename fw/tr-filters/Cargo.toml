@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+
+[package]
+name = "tr-filters"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "N2ADR filter board responses computed from the part values"
+
+[dependencies]
+libm = { version = "0.2.16", default-features = false }

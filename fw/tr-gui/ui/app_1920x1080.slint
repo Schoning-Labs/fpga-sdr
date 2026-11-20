@@ -1,0 +1,59 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Franz Schöning, https://www.schoning.com
+//
+// What the firmware shows: one window with the FT8 view, the FreeDV view or the LISTEN view
+// (docs/LISTEN.md), and the pointer of a USB mouse on top. It is one window so that switching
+// only changes what is drawn and the damage tracking of the two frame buffers stays whole.
+// `AppModel` chooses the view, the other models (`Ft8Model`, `FdvModel`, `ListenModel`) hold the
+// state of each view.
+
+import { Ft8View } from "ft8_view.slint";
+import { FdvView } from "fdv_view.slint";
+import { ListenView } from "listen_view.slint";
+export { Ft8Model, Ft8Row } from "ft8_model.slint";
+export { FdvModel, FdvTick } from "fdv_model.slint";
+export { ListenModel, ListenTick } from "listen_model.slint";
+
+export global AppModel {
+    // false = FT8, true = FreeDV
+    in-out property <bool> freedv: false;
+    // true = LISTEN (shown over either of the two above)
+    in-out property <bool> listen: false;
+    // the pointer of a USB mouse (docs/USB_HOST.md section 6): its tip, in pixels
+    in-out property <length> pointer-x: 960px;
+    in-out property <length> pointer-y: 540px;
+    in-out property <bool> pointer-shown: false;
+}
+
+// An arrow of 12 two-pixel rows, white with a black edge. It is drawn by the software renderer,
+// so a move redraws two small rectangles and the compositor needs no sprite.
+component PointerArrow inherits Rectangle {
+    width: 20px;
+    height: 28px;
+    for i in 12: Rectangle {
+        x: 0px;
+        y: i * 2px;
+        width: (i < 9 ? (i + 1) * 1.6px : (12 - i) * 2.4px) + 3px;
+        height: 3px;
+        background: black;
+    }
+    for i in 12: Rectangle {
+        x: 1px;
+        y: i * 2px + 1px;
+        width: (i < 9 ? (i + 1) * 1.6px : (12 - i) * 2.4px);
+        height: 2px;
+        background: white;
+    }
+}
+
+export component AppScreen1920x1080 inherits Window {
+    width: 1920px;
+    height: 1080px;
+    if !AppModel.freedv && !AppModel.listen: Ft8View { }
+    if AppModel.freedv && !AppModel.listen: FdvView { }
+    if AppModel.listen: ListenView { }
+    if AppModel.pointer-shown: PointerArrow {
+        x: AppModel.pointer-x;
+        y: AppModel.pointer-y;
+    }
+}

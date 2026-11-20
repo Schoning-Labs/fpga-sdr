@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Resource estimate for the zoom DDC + zoom FFT (rtl/zoom/zoom_spectrum.v) with yosys'
+# experimental Gowin GW5A flow (synthesis only, no place-and-route; Gowin EDA Standard gives
+# the real numbers). Same convention as sim/fft/yosys_gw5a.ys: fft_mul is kept as a
+# black box (yosys does not map multipliers to GW5A DSP blocks), so each fft_mul instance in the
+# statistics is one 27x18 DSP multiplier; the CIC/CORDIC stages have no `*` in their RTL (pure
+# shift/add), so any multiplier-shaped cell yosys's alumacc pass reports for them is a multi-operand
+# adder chain, not a real multiplier -- same distinction docs/RX_DSP.md section 5 makes for the
+# receiver bank. Run from the repository root:
+#   yosys -s sim/zoom/yosys_gw5a.ys | tail -60      (a few minutes)
+read_verilog -lib rtl/fft/fft_mul.v
+read_verilog \
+  rtl/rx/nco_mixer.v rtl/rx/cic_integrator.v rtl/rx/cic_comb.v rtl/rx/cic_fixed.v \
+  rtl/zoom/cic_var_pow2.v rtl/zoom/zoom_fir_half.v rtl/zoom/zoom_cic_comp.v rtl/zoom/zoom_ddc.v \
+  rtl/zoom/zoom_window.v \
+  rtl/fft/fft_delay.v rtl/fft/fft_bf.v rtl/fft/fft_twmul.v rtl/fft/fft_r22sdf.v \
+  rtl/zoom/zoom_spectrum.v
+synth_gowin -family gw5a -top zoom_spectrum -noiopads
+stat

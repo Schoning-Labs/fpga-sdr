@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Franz Schöning, https://www.schoning.com
+#
+# Resource estimate for the full-band spectrum pipeline with yosys' experimental Gowin GW5A flow
+# (synthesis only, no place-and-route; Gowin EDA Standard gives the real numbers -- PLAN T1).
+#
+# Unlike sim/fft/yosys_gw5a.ys, fft_mul is NOT blackboxed here: rtl/spectrum/spectrum_pipeline.v
+# is self-contained (it `includes` every rtl/fft/*.v and rtl/spectrum/*.v file it needs, the same
+# convention tools/check.sh requires of a testbench, so a Gowin project can add this one file),
+# and reading it after a separate blackbox `read_verilog -lib rtl/fft/fft_mul.v` redefines
+# `fft_mul` and yosys refuses. So this run's LUT/register count includes the FFT's 6 twiddle
+# multiplies (fft_mul, rtl/fft/fft_mul.v) synthesized as generic logic, not as the 24 DSP entries
+# docs/F1_FFT.md reports from its own blackboxed run -- add those 24 DSPs back in by hand when
+# comparing totals, and expect this run's LUT count to be well above F1's for that reason. The
+# window multiply, power square, colour multiply and the K-average divide are generic logic in
+# both this run and on real Gowin synthesis (only fft_mul.v is written for a vendor DSP wrapper
+# to replace, see docs/F1_FFT.md "Open" and PLAN R3); yosys does not map any of them to GW5A DSP
+# blocks either way, so the real LUT count on Gowin synthesis will be lower than this estimate,
+# same caveat as sim/fft/yosys_gw5a.ys.
+# Run from the repository root:
+#   yosys -s sim/spectrum/yosys_gw5a.ys | tail -60
+read_verilog rtl/spectrum/spectrum_pipeline.v
+synth_gowin -family gw5a -top spectrum_pipeline -noiopads
+stat
